@@ -32,6 +32,7 @@ Backend :
 - PostgreSQL ;
 - Hibernate/JPA via Spring Data JPA ;
 - Flyway ;
+- Backblaze B2 pour les fichiers joints ;
 - springdoc-openapi / Swagger ;
 - JUnit 5 ;
 - Testcontainers.
@@ -111,10 +112,52 @@ http://localhost:8080/swagger-ui/index.html
 http://localhost:8080/v3/api-docs
 ```
 
+Stockage fichiers joints :
+
+Par defaut, `CALENDARY_B2_ENABLED=false`, ce qui permet de lancer les tests et le backend local sans credentials cloud. Pour utiliser Backblaze B2 :
+
+```bash
+export CALENDARY_B2_ENABLED=true
+export CALENDARY_B2_KEY_ID=...
+export CALENDARY_B2_APPLICATION_KEY=...
+export CALENDARY_B2_BUCKET_ID=...
+export CALENDARY_B2_BUCKET_NAME=...
+```
+
 Les tests peuvent etre lances avec :
 
 ```bash
 ./gradlew test
+```
+
+## Lancement Frontend
+
+Le frontend est dans `frontend/` et utilise Bun, React SSR, Vite, TanStack Router, TanStack Query, Tailwind et des composants UI compatibles shadcn.
+
+Installer les dependances :
+
+```bash
+cd frontend
+bun install
+```
+
+Lancer le serveur SSR de developpement :
+
+```bash
+bun run dev
+```
+
+L'interface est disponible sur :
+
+```text
+http://localhost:5173/calendar
+```
+
+Verifier le frontend :
+
+```bash
+bun run typecheck
+bun run build
 ```
 
 ## Roadmap Initiale
