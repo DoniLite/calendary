@@ -1,6 +1,6 @@
 services:
   postgres:
-    image: 'postgres:18-alpine'
+    image: 'postgres:17-alpine'
     environment:
       POSTGRES_DB: calendary
       POSTGRES_USER: calendary
@@ -8,14 +8,6 @@ services:
     ports:
       - '5432:5432'
     volumes:
-      - calendary-postgres-data:/var/lib/postgresql/data
-
-  grafana-lgtm:
-    image: 'grafana/otel-lgtm:latest'
-    ports:
-      - '3000:3000'
-      - '4317'
-      - '4318'
-
+      - calendary-postgres-17-data:/var/lib/postgresql/data
 volumes:
-  calendary-postgres-data:
+  calendary-postgres-17-data:

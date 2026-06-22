@@ -81,10 +81,34 @@ Le theming doit etre base sur des variables CSS compatibles Tailwind/shadcn et i
 
 ## Lancement Backend
 
-Le projet est encore au stade de cadrage initial. Le backend Spring Boot peut etre lance avec :
+Le backend a besoin de PostgreSQL en local.
+
+Demarrer PostgreSQL :
+
+```bash
+docker compose up -d postgres
+```
+
+Puis lancer Spring Boot :
 
 ```bash
 ./gradlew bootRun
+```
+
+Si un ancien service Compose tourne sans PostgreSQL, ou si tu avais lance l'ancien conteneur Postgres 18 de dev avec un volume incompatible, nettoyer une fois le projet Compose :
+
+```bash
+docker compose down --remove-orphans
+docker compose up -d postgres
+```
+
+L'API est ensuite disponible sur `http://localhost:8080`.
+
+Swagger/OpenAPI :
+
+```text
+http://localhost:8080/swagger-ui/index.html
+http://localhost:8080/v3/api-docs
 ```
 
 Les tests peuvent etre lances avec :
