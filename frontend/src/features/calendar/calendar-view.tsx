@@ -1,4 +1,5 @@
 import { CalendarClock, ChevronLeft, ChevronRight, Globe2, Lock, Paperclip, Users } from 'lucide-react'
+import { Link } from '@tanstack/react-router'
 import { useMemo, useState } from 'react'
 import { Badge } from '../../components/ui/badge'
 import { Button } from '../../components/ui/button'
@@ -153,7 +154,7 @@ function CalendarDetails({ item }: { item: CalendarItem }) {
   return (
     <PanelBody className="space-y-4">
       <div className="rounded-md border p-3" style={{ backgroundColor: item.color.background, color: item.color.foreground, borderColor: item.color.border }}>
-        <div className="text-base font-semibold">{item.title}</div>
+        <Link to="/app/event-detail" className="text-base font-semibold hover:underline">{item.title}</Link>
         <div className="mt-1 text-sm opacity-80">
           {item.startsAt} - {item.endsAt}
         </div>

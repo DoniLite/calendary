@@ -1,6 +1,10 @@
 package com.calendary.projects.application
 
+import com.calendary.calendar.domain.CalendarColorPreset
+import com.calendary.calendar.domain.CalendarBlock
+import com.calendary.calendar.domain.CalendarBlockSourceType
 import com.calendary.calendar.domain.CalendarVisibility
+import com.calendary.calendar.infra.CalendarBlockRepository
 import com.calendary.projects.domain.Project
 import com.calendary.projects.domain.ProjectStatus
 import com.calendary.projects.domain.ProjectType
@@ -15,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional
 @Service
 class ProjectService(
 	private val projects: ProjectRepository,
+	private val calendarBlocks: CalendarBlockRepository,
 	private val users: UserAccountRepository,
 	private val workspaceAccess: WorkspaceAccessService,
 ) {
@@ -29,8 +34,9 @@ class ProjectService(
 		}
 		require(command.type == ProjectType.PROJECT || parent != null) { "Epic requires a parent project." }
 		require(command.type == ProjectType.EPIC || parent == null) { "Project cannot have a parent project." }
+		requireValidPlanning(command.startsAt, command.dueAt)
 
-		return projects.save(
+		val project = projects.save(
 			Project(
 				workspace = workspace,
 				createdBy = creator,
@@ -40,10 +46,13 @@ class ProjectService(
 				type = command.type,
 				status = command.status,
 				visibility = command.visibility,
+				colorPreset = command.colorPreset,
 				startsAt = command.startsAt,
 				dueAt = command.dueAt,
 			),
 		)
+		syncCalendarBlock(project)
+		return project
 	}
 
 	@Transactional(readOnly = true)
@@ -76,6 +85,7 @@ class ProjectService(
 		require(command.type == ProjectType.PROJECT || parent != null) { "Epic requires a parent project." }
 		require(command.type == ProjectType.EPIC || parent == null) { "Project cannot have a parent project." }
 		require(parent?.id != project.id) { "Project cannot be its own parent." }
+		requireValidPlanning(command.startsAt, command.dueAt)
 
 		project.parentProject = parent
 		project.title = command.title.trim()
@@ -83,9 +93,45 @@ class ProjectService(
 		project.type = command.type
 		project.status = command.status
 		project.visibility = command.visibility
+		project.colorPreset = command.colorPreset
 		project.startsAt = command.startsAt
 		project.dueAt = command.dueAt
+		syncCalendarBlock(project)
 		return project
+	}
+
+	private fun requireValidPlanning(startsAt: Instant?, dueAt: Instant?) {
+		if (startsAt != null || dueAt != null) {
+			require(startsAt != null && dueAt != null) { "Project planning requires start and due date." }
+			require(dueAt.isAfter(startsAt)) { "Project due date must be after start." }
+		}
+	}
+
+	private fun syncCalendarBlock(project: Project) {
+		val existingBlock = calendarBlocks.findBySourceTypeAndSourceId(CalendarBlockSourceType.PROJECT, project.id)
+		val startsAt = project.startsAt
+		val dueAt = project.dueAt
+		if (startsAt != null && dueAt != null) {
+			val block = existingBlock.orElseGet {
+				CalendarBlock(
+					workspace = project.workspace,
+					sourceType = CalendarBlockSourceType.PROJECT,
+					sourceId = project.id,
+				)
+			}
+			block.title = project.title
+			block.startsAt = startsAt
+			block.endsAt = dueAt
+			block.timezone = "UTC"
+			block.visibility = project.visibility
+			block.colorPreset = project.colorPreset
+			block.busy = project.status != ProjectStatus.DONE && project.status != ProjectStatus.ARCHIVED
+			if (existingBlock.isEmpty) {
+				calendarBlocks.save(block)
+			}
+		} else {
+			existingBlock.ifPresent { calendarBlocks.delete(it) }
+		}
 	}
 }
 
@@ -97,6 +143,7 @@ data class CreateProjectCommand(
 	val type: ProjectType = ProjectType.PROJECT,
 	val status: ProjectStatus = ProjectStatus.ACTIVE,
 	val visibility: CalendarVisibility = CalendarVisibility.PRIVATE,
+	val colorPreset: CalendarColorPreset = CalendarColorPreset.ORANGE,
 	val parentProjectId: UUID? = null,
 	val startsAt: Instant? = null,
 	val dueAt: Instant? = null,
@@ -111,6 +158,7 @@ data class UpdateProjectCommand(
 	val type: ProjectType = ProjectType.PROJECT,
 	val status: ProjectStatus = ProjectStatus.ACTIVE,
 	val visibility: CalendarVisibility = CalendarVisibility.PRIVATE,
+	val colorPreset: CalendarColorPreset = CalendarColorPreset.ORANGE,
 	val parentProjectId: UUID? = null,
 	val startsAt: Instant? = null,
 	val dueAt: Instant? = null,

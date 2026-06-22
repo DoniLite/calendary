@@ -1,5 +1,6 @@
 package com.calendary.tasks.api.dto
 
+import com.calendary.calendar.domain.CalendarColorPreset
 import com.calendary.calendar.domain.CalendarVisibility
 import com.calendary.tasks.domain.TaskPriority
 import com.calendary.tasks.domain.TaskStatus
@@ -14,6 +15,7 @@ data class CreateTaskRequest(
 	val status: TaskStatus = TaskStatus.TODO,
 	val priority: TaskPriority = TaskPriority.MEDIUM,
 	val visibility: CalendarVisibility = CalendarVisibility.PRIVATE,
+	val colorPreset: CalendarColorPreset = CalendarColorPreset.GREEN,
 	val dueAt: Instant? = null,
 	val projectId: UUID? = null,
 	val epicId: UUID? = null,

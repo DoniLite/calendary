@@ -2,6 +2,7 @@ package com.calendary.tasks.application
 
 import com.calendary.calendar.domain.CalendarBlock
 import com.calendary.calendar.domain.CalendarBlockSourceType
+import com.calendary.calendar.domain.CalendarColorPreset
 import com.calendary.calendar.domain.CalendarVisibility
 import com.calendary.calendar.infra.CalendarBlockRepository
 import com.calendary.projects.domain.ProjectType
@@ -59,6 +60,7 @@ class TaskService(
 				status = command.status,
 				priority = command.priority,
 				visibility = command.visibility,
+				colorPreset = command.colorPreset,
 				dueAt = command.dueAt,
 				project = project,
 				epic = epic,
@@ -77,6 +79,7 @@ class TaskService(
 					sourceType = CalendarBlockSourceType.TASK,
 					sourceId = task.id,
 					visibility = task.visibility,
+					colorPreset = task.colorPreset,
 					busy = true,
 				),
 			)
@@ -120,6 +123,7 @@ class TaskService(
 		task.status = command.status
 		task.priority = command.priority
 		task.visibility = command.visibility
+		task.colorPreset = command.colorPreset
 		task.dueAt = command.dueAt
 		task.project = project
 		task.epic = epic
@@ -140,6 +144,7 @@ class TaskService(
 			block.endsAt = command.plannedEnd
 			block.timezone = command.timezone.ifBlank { "UTC" }
 			block.visibility = task.visibility
+			block.colorPreset = task.colorPreset
 			block.busy = task.status != TaskStatus.DONE && task.status != TaskStatus.ARCHIVED
 			if (existingBlock.isEmpty) {
 				calendarBlocks.save(block)
@@ -169,6 +174,7 @@ data class CreateTaskCommand(
 	val status: TaskStatus = TaskStatus.TODO,
 	val priority: TaskPriority = TaskPriority.MEDIUM,
 	val visibility: CalendarVisibility = CalendarVisibility.PRIVATE,
+	val colorPreset: CalendarColorPreset = CalendarColorPreset.GREEN,
 	val dueAt: Instant? = null,
 	val projectId: UUID? = null,
 	val epicId: UUID? = null,
@@ -188,6 +194,7 @@ data class UpdateTaskCommand(
 	val status: TaskStatus = TaskStatus.TODO,
 	val priority: TaskPriority = TaskPriority.MEDIUM,
 	val visibility: CalendarVisibility = CalendarVisibility.PRIVATE,
+	val colorPreset: CalendarColorPreset = CalendarColorPreset.GREEN,
 	val dueAt: Instant? = null,
 	val projectId: UUID? = null,
 	val epicId: UUID? = null,

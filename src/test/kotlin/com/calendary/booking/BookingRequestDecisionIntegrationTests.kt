@@ -6,6 +6,7 @@ import com.calendary.support.PostgresIntegrationTest
 import com.calendary.workspaces.domain.WorkspaceType
 import com.calendary.workspaces.infra.WorkspaceRepository
 import kotlin.test.Test
+import org.hamcrest.Matchers.nullValue
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.http.MediaType
 import org.springframework.mock.web.MockHttpSession
@@ -33,6 +34,7 @@ class BookingRequestDecisionIntegrationTests(
 		mockMvc.perform(mvcPatch("/api/workspaces/$workspaceId/booking-requests/$bookingRequestId/accept").session(session))
 			.andExpect(status().isOk)
 			.andExpect(jsonPath("$.status").value("ACCEPTED"))
+			.andExpect(jsonPath("$.conferenceUrl").value(nullValue()))
 
 		mockMvc.perform(
 			mvcGet("/api/workspaces/$workspaceId/calendar")

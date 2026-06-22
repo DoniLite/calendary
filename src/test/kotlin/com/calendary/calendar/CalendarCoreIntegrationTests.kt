@@ -41,13 +41,16 @@ class CalendarCoreIntegrationTests(
 				  "startsAt": "2026-07-01T09:00:00Z",
 				  "endsAt": "2026-07-01T10:00:00Z",
 				  "timezone": "Europe/Paris",
-				  "visibility": "PRIVATE"
+				  "visibility": "PRIVATE",
+				  "colorPreset": "ROSE"
 				}
 					""".trimIndent(),
 				),
 		)
 			.andExpect(status().isCreated)
 			.andExpect(jsonPath("$.title").value("Client meeting"))
+			.andExpect(jsonPath("$.color.preset").value("ROSE"))
+			.andExpect(jsonPath("$.color.background").value("#ffe4e6"))
 
 		mockMvc.perform(
 			mvcPost("/api/workspaces/$workspaceId/tasks")
@@ -59,6 +62,7 @@ class CalendarCoreIntegrationTests(
 				  "title": "Prepare deck",
 				  "description": "Slides for kickoff",
 				  "priority": "HIGH",
+				  "colorPreset": "VIOLET",
 				  "plannedStart": "2026-07-01T11:00:00Z",
 				  "plannedEnd": "2026-07-01T12:00:00Z",
 				  "timezone": "Europe/Paris"
@@ -68,6 +72,7 @@ class CalendarCoreIntegrationTests(
 		)
 			.andExpect(status().isCreated)
 			.andExpect(jsonPath("$.title").value("Prepare deck"))
+			.andExpect(jsonPath("$.color.preset").value("VIOLET"))
 
 		mockMvc.perform(
 			mvcGet("/api/workspaces/$workspaceId/calendar")
@@ -78,7 +83,9 @@ class CalendarCoreIntegrationTests(
 			.andExpect(status().isOk)
 			.andExpect(jsonPath("$.items.length()").value(2))
 			.andExpect(jsonPath("$.items[0].sourceType").value("EVENT"))
+			.andExpect(jsonPath("$.items[0].color.preset").value("ROSE"))
 			.andExpect(jsonPath("$.items[1].sourceType").value("TASK"))
+			.andExpect(jsonPath("$.items[1].color.preset").value("VIOLET"))
 	}
 
 	@Test

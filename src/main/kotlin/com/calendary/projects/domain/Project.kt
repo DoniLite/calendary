@@ -1,5 +1,6 @@
 package com.calendary.projects.domain
 
+import com.calendary.calendar.domain.CalendarColorPreset
 import com.calendary.calendar.domain.CalendarVisibility
 import com.calendary.common.persistence.AuditableEntity
 import com.calendary.users.domain.UserAccount
@@ -46,6 +47,10 @@ open class Project(
 	@Enumerated(EnumType.STRING)
 	@Column(nullable = false)
 	open var visibility: CalendarVisibility = CalendarVisibility.PRIVATE,
+
+	@Enumerated(EnumType.STRING)
+	@Column(name = "color_preset", nullable = false)
+	open var colorPreset: CalendarColorPreset = CalendarColorPreset.ORANGE,
 
 	@Column(name = "starts_at")
 	open var startsAt: Instant? = null,

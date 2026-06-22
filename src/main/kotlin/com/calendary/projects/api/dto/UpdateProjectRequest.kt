@@ -1,5 +1,6 @@
 package com.calendary.projects.api.dto
 
+import com.calendary.calendar.domain.CalendarColorPreset
 import com.calendary.calendar.domain.CalendarVisibility
 import com.calendary.projects.domain.ProjectStatus
 import com.calendary.projects.domain.ProjectType
@@ -14,6 +15,7 @@ data class UpdateProjectRequest(
 	val type: ProjectType = ProjectType.PROJECT,
 	val status: ProjectStatus = ProjectStatus.ACTIVE,
 	val visibility: CalendarVisibility = CalendarVisibility.PRIVATE,
+	val colorPreset: CalendarColorPreset = CalendarColorPreset.ORANGE,
 	val parentProjectId: UUID? = null,
 	val startsAt: Instant? = null,
 	val dueAt: Instant? = null,

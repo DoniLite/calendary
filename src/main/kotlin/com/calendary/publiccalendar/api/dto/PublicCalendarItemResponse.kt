@@ -1,5 +1,7 @@
 package com.calendary.publiccalendar.api.dto
 
+import com.calendary.calendar.api.dto.CalendarColorResponse
+import com.calendary.calendar.api.dto.toResponse
 import com.calendary.publiccalendar.application.PublicCalendarItem
 import java.time.Instant
 
@@ -10,6 +12,7 @@ data class PublicCalendarItemResponse(
 	val public: Boolean,
 	val title: String?,
 	val sourceType: String?,
+	val color: CalendarColorResponse?,
 )
 
 fun PublicCalendarItem.toResponse(): PublicCalendarItemResponse =
@@ -20,4 +23,5 @@ fun PublicCalendarItem.toResponse(): PublicCalendarItemResponse =
 		public = public,
 		title = title,
 		sourceType = sourceType,
+		color = colorPreset?.toResponse(),
 	)

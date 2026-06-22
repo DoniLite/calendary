@@ -1,5 +1,6 @@
 package com.calendary.events.api.dto
 
+import com.calendary.calendar.domain.CalendarColorPreset
 import com.calendary.calendar.domain.CalendarVisibility
 import jakarta.validation.constraints.NotBlank
 import java.time.Instant
@@ -12,4 +13,5 @@ data class CreateEventRequest(
 	val endsAt: Instant,
 	val timezone: String = "UTC",
 	val visibility: CalendarVisibility = CalendarVisibility.PRIVATE,
+	val colorPreset: CalendarColorPreset = CalendarColorPreset.BLUE,
 )

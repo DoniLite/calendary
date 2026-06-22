@@ -43,6 +43,10 @@ open class CalendarBlock(
 	@Column(nullable = false)
 	open var visibility: CalendarVisibility = CalendarVisibility.PRIVATE,
 
+	@Enumerated(EnumType.STRING)
+	@Column(name = "color_preset", nullable = false)
+	open var colorPreset: CalendarColorPreset = CalendarColorPreset.BLUE,
+
 	@Column(nullable = false)
 	open var busy: Boolean = true,
 ) : AuditableEntity()

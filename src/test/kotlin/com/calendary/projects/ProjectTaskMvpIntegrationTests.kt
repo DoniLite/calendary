@@ -40,13 +40,17 @@ class ProjectTaskMvpIntegrationTests(
 					  "description": "Backend delivery",
 					  "type": "PROJECT",
 					  "status": "ACTIVE",
-					  "visibility": "PRIVATE"
+					  "visibility": "PRIVATE",
+					  "colorPreset": "AMBER",
+					  "startsAt": "2026-07-01T08:00:00Z",
+					  "dueAt": "2026-07-01T12:00:00Z"
 					}
 					""".trimIndent(),
 				),
 		)
 			.andExpect(status().isCreated)
 			.andExpect(jsonPath("$.title").value("Calendary MVP"))
+			.andExpect(jsonPath("$.color.preset").value("AMBER"))
 			.andReturn()
 			.response
 			.contentAsString
@@ -97,6 +101,16 @@ class ProjectTaskMvpIntegrationTests(
 		mockMvc.perform(mvcGet("/api/workspaces/$workspaceId/projects").session(session))
 			.andExpect(status().isOk)
 			.andExpect(jsonPath("$.projects.length()").value(2))
+
+		mockMvc.perform(
+			mvcGet("/api/workspaces/$workspaceId/calendar")
+				.session(session)
+				.param("start", "2026-07-01T00:00:00Z")
+				.param("end", "2026-07-02T00:00:00Z"),
+		)
+			.andExpect(status().isOk)
+			.andExpect(jsonPath("$.items[0].sourceType").value("PROJECT"))
+			.andExpect(jsonPath("$.items[0].color.preset").value("AMBER"))
 	}
 
 	private fun bootstrapWorkspace(): java.util.UUID {

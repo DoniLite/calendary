@@ -1,5 +1,7 @@
 package com.calendary.projects.api.dto
 
+import com.calendary.calendar.api.dto.CalendarColorResponse
+import com.calendary.calendar.api.dto.toResponse
 import com.calendary.calendar.domain.CalendarVisibility
 import com.calendary.projects.domain.Project
 import com.calendary.projects.domain.ProjectStatus
@@ -16,6 +18,7 @@ data class ProjectResponse(
 	val type: ProjectType,
 	val status: ProjectStatus,
 	val visibility: CalendarVisibility,
+	val color: CalendarColorResponse,
 	val startsAt: Instant?,
 	val dueAt: Instant?,
 )
@@ -30,6 +33,7 @@ fun Project.toResponse(): ProjectResponse =
 		type = type,
 		status = status,
 		visibility = visibility,
+		color = colorPreset.toResponse(),
 		startsAt = startsAt,
 		dueAt = dueAt,
 	)

@@ -2,6 +2,7 @@ package com.calendary.events.application
 
 import com.calendary.calendar.domain.CalendarBlock
 import com.calendary.calendar.domain.CalendarBlockSourceType
+import com.calendary.calendar.domain.CalendarColorPreset
 import com.calendary.calendar.domain.CalendarVisibility
 import com.calendary.calendar.infra.CalendarBlockRepository
 import com.calendary.events.domain.Event
@@ -38,7 +39,10 @@ class EventService(
 				startsAt = command.startsAt,
 				endsAt = command.endsAt,
 				timezone = command.timezone.ifBlank { "UTC" },
+				conferenceUrl = command.conferenceUrl,
+				externalCalendarEventId = command.externalCalendarEventId,
 				visibility = command.visibility,
+				colorPreset = command.colorPreset,
 				status = EventStatus.CONFIRMED,
 			),
 		)
@@ -52,6 +56,7 @@ class EventService(
 				sourceType = CalendarBlockSourceType.EVENT,
 				sourceId = event.id,
 				visibility = event.visibility,
+				colorPreset = event.colorPreset,
 				busy = true,
 			),
 		)
@@ -78,6 +83,7 @@ class EventService(
 		event.endsAt = command.endsAt
 		event.timezone = command.timezone.ifBlank { "UTC" }
 		event.visibility = command.visibility
+		event.colorPreset = command.colorPreset
 		event.status = command.status
 
 		val block = calendarBlocks.findBySourceTypeAndSourceId(CalendarBlockSourceType.EVENT, event.id)
@@ -87,6 +93,7 @@ class EventService(
 		block.endsAt = event.endsAt
 		block.timezone = event.timezone
 		block.visibility = event.visibility
+		block.colorPreset = event.colorPreset
 		block.busy = event.status != EventStatus.CANCELLED
 
 		return event
@@ -111,7 +118,10 @@ data class CreateEventCommand(
 	val startsAt: Instant,
 	val endsAt: Instant,
 	val timezone: String = "UTC",
+	val conferenceUrl: String? = null,
+	val externalCalendarEventId: String? = null,
 	val visibility: CalendarVisibility = CalendarVisibility.PRIVATE,
+	val colorPreset: CalendarColorPreset = CalendarColorPreset.BLUE,
 )
 
 data class UpdateEventCommand(
@@ -124,5 +134,6 @@ data class UpdateEventCommand(
 	val endsAt: Instant,
 	val timezone: String = "UTC",
 	val visibility: CalendarVisibility = CalendarVisibility.PRIVATE,
+	val colorPreset: CalendarColorPreset = CalendarColorPreset.BLUE,
 	val status: EventStatus = EventStatus.CONFIRMED,
 )

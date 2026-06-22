@@ -1,5 +1,6 @@
 package com.calendary.events.domain
 
+import com.calendary.calendar.domain.CalendarColorPreset
 import com.calendary.calendar.domain.CalendarVisibility
 import com.calendary.common.persistence.AuditableEntity
 import com.calendary.users.domain.UserAccount
@@ -40,9 +41,19 @@ open class Event(
 	@Column(nullable = false)
 	open var timezone: String = "UTC",
 
+	@Column(name = "conference_url")
+	open var conferenceUrl: String? = null,
+
+	@Column(name = "external_calendar_event_id")
+	open var externalCalendarEventId: String? = null,
+
 	@Enumerated(EnumType.STRING)
 	@Column(nullable = false)
 	open var visibility: CalendarVisibility = CalendarVisibility.PRIVATE,
+
+	@Enumerated(EnumType.STRING)
+	@Column(name = "color_preset", nullable = false)
+	open var colorPreset: CalendarColorPreset = CalendarColorPreset.BLUE,
 
 	@Enumerated(EnumType.STRING)
 	@Column(nullable = false)

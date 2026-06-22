@@ -1,5 +1,6 @@
 package com.calendary.tasks.domain
 
+import com.calendary.calendar.domain.CalendarColorPreset
 import com.calendary.calendar.domain.CalendarVisibility
 import com.calendary.common.persistence.AuditableEntity
 import com.calendary.projects.domain.Project
@@ -43,6 +44,10 @@ open class Task(
 	@Enumerated(EnumType.STRING)
 	@Column(nullable = false)
 	open var visibility: CalendarVisibility = CalendarVisibility.PRIVATE,
+
+	@Enumerated(EnumType.STRING)
+	@Column(name = "color_preset", nullable = false)
+	open var colorPreset: CalendarColorPreset = CalendarColorPreset.GREEN,
 
 	@Column(name = "due_at")
 	open var dueAt: Instant? = null,

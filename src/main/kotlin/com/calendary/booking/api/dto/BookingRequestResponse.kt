@@ -14,6 +14,8 @@ data class BookingRequestResponse(
 	val startsAt: Instant,
 	val endsAt: Instant,
 	val timezone: String,
+	val conferenceUrl: String?,
+	val externalCalendarEventId: String?,
 	val status: BookingRequestStatus,
 )
 
@@ -27,5 +29,7 @@ fun BookingRequest.toResponse(): BookingRequestResponse =
 		startsAt = startsAt,
 		endsAt = endsAt,
 		timezone = timezone,
+		conferenceUrl = conferenceUrl,
+		externalCalendarEventId = externalCalendarEventId,
 		status = status,
 	)

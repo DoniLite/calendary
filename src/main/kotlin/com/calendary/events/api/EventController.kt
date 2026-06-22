@@ -46,6 +46,7 @@ class EventController(
 				endsAt = request.endsAt,
 				timezone = request.timezone,
 				visibility = request.visibility,
+				colorPreset = request.colorPreset,
 			),
 		).toResponse()
 	}
@@ -79,6 +80,7 @@ class EventController(
 				endsAt = request.endsAt,
 				timezone = request.timezone,
 				visibility = request.visibility,
+				colorPreset = request.colorPreset,
 				status = request.status,
 			),
 		).toResponse()

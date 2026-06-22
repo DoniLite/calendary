@@ -1,6 +1,7 @@
 package com.calendary.publiccalendar.application
 
 import com.calendary.calendar.domain.CalendarVisibility
+import com.calendary.calendar.domain.CalendarColorPreset
 import com.calendary.calendar.infra.CalendarBlockRepository
 import com.calendary.workspaces.infra.WorkspaceRepository
 import java.time.Duration
@@ -36,6 +37,7 @@ class PublicCalendarService(
 					public = public,
 					title = if (public) it.title else null,
 					sourceType = if (public) it.sourceType.name else null,
+					colorPreset = if (public) it.colorPreset else null,
 				)
 			}
 
@@ -106,6 +108,7 @@ data class PublicCalendarItem(
 	val public: Boolean,
 	val title: String?,
 	val sourceType: String?,
+	val colorPreset: CalendarColorPreset?,
 )
 
 data class PublicAvailabilityQuery(

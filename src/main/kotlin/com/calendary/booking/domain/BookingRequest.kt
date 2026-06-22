@@ -37,6 +37,12 @@ open class BookingRequest(
 	@Column(nullable = false)
 	open var timezone: String = "UTC",
 
+	@Column(name = "conference_url")
+	open var conferenceUrl: String? = null,
+
+	@Column(name = "external_calendar_event_id")
+	open var externalCalendarEventId: String? = null,
+
 	@Enumerated(EnumType.STRING)
 	@Column(nullable = false)
 	open var status: BookingRequestStatus = BookingRequestStatus.PENDING,

@@ -1,5 +1,7 @@
 package com.calendary.events.api.dto
 
+import com.calendary.calendar.api.dto.CalendarColorResponse
+import com.calendary.calendar.api.dto.toResponse
 import com.calendary.calendar.domain.CalendarVisibility
 import com.calendary.events.domain.Event
 import com.calendary.events.domain.EventStatus
@@ -14,7 +16,10 @@ data class EventResponse(
 	val startsAt: Instant,
 	val endsAt: Instant,
 	val timezone: String,
+	val conferenceUrl: String?,
+	val externalCalendarEventId: String?,
 	val visibility: CalendarVisibility,
+	val color: CalendarColorResponse,
 	val status: EventStatus,
 )
 
@@ -27,6 +32,9 @@ fun Event.toResponse(): EventResponse =
 		startsAt = startsAt,
 		endsAt = endsAt,
 		timezone = timezone,
+		conferenceUrl = conferenceUrl,
+		externalCalendarEventId = externalCalendarEventId,
 		visibility = visibility,
+		color = colorPreset.toResponse(),
 		status = status,
 	)

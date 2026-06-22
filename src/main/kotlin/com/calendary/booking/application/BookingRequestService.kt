@@ -5,6 +5,8 @@ import com.calendary.booking.domain.BookingRequestStatus
 import com.calendary.booking.infra.BookingRequestRepository
 import com.calendary.calendar.domain.CalendarVisibility
 import com.calendary.calendar.infra.CalendarBlockRepository
+import com.calendary.conferencing.application.ConferenceService
+import com.calendary.conferencing.application.CreateConferenceCommand
 import com.calendary.events.application.CreateEventCommand
 import com.calendary.events.application.EventService
 import com.calendary.mail.application.MailService
@@ -26,6 +28,7 @@ class BookingRequestService(
 	private val notifications: NotificationService,
 	private val events: EventService,
 	private val mail: MailService,
+	private val conferences: ConferenceService,
 ) {
 	@Transactional
 	fun create(command: CreateBookingRequestCommand): BookingRequest {
@@ -93,6 +96,18 @@ class BookingRequestService(
 		)
 		check(!busy) { "Requested time is not available." }
 
+		val conference = conferences.createMeeting(
+			CreateConferenceCommand(
+				requestId = bookingRequest.id,
+				title = "Meeting with ${bookingRequest.requesterName}",
+				description = bookingRequest.message,
+				startsAt = bookingRequest.startsAt,
+				endsAt = bookingRequest.endsAt,
+				timezone = bookingRequest.timezone,
+				attendeeEmail = bookingRequest.requesterEmail,
+			),
+		)
+
 		events.create(
 			CreateEventCommand(
 				workspaceId = command.workspaceId,
@@ -102,16 +117,20 @@ class BookingRequestService(
 				startsAt = bookingRequest.startsAt,
 				endsAt = bookingRequest.endsAt,
 				timezone = bookingRequest.timezone,
+				conferenceUrl = conference?.url,
+				externalCalendarEventId = conference?.externalCalendarEventId,
 				visibility = CalendarVisibility.PRIVATE,
 			),
 		)
+		bookingRequest.conferenceUrl = conference?.url
+		bookingRequest.externalCalendarEventId = conference?.externalCalendarEventId
 		bookingRequest.status = BookingRequestStatus.ACCEPTED
 		notifyOwner(bookingRequest, NotificationType.BOOKING_ACCEPTED, "Booking request accepted")
 		mail.send(
 			SendMailCommand(
 				to = bookingRequest.requesterEmail,
 				subject = "Your Calendary booking request was accepted",
-				body = "Your meeting request from ${bookingRequest.startsAt} to ${bookingRequest.endsAt} was accepted.",
+				body = buildAcceptedMailBody(bookingRequest),
 			),
 		)
 		return bookingRequest
@@ -148,6 +167,19 @@ class BookingRequestService(
 			),
 		)
 	}
+
+	private fun buildAcceptedMailBody(bookingRequest: BookingRequest): String =
+		buildString {
+			appendLine("Hi ${bookingRequest.requesterName},")
+			appendLine()
+			appendLine("Your meeting request was accepted.")
+			appendLine("Time: ${bookingRequest.startsAt} to ${bookingRequest.endsAt} (${bookingRequest.timezone})")
+			bookingRequest.conferenceUrl?.let {
+				appendLine("Google Meet: $it")
+			}
+			appendLine()
+			appendLine("Please be on time.")
+		}
 }
 
 data class CreateBookingRequestCommand(

@@ -1,6 +1,7 @@
 package com.calendary.calendar.application
 
 import com.calendary.calendar.domain.CalendarBlockSourceType
+import com.calendary.calendar.domain.CalendarColorPreset
 import com.calendary.calendar.domain.CalendarVisibility
 import com.calendary.calendar.infra.CalendarBlockRepository
 import com.calendary.workspaces.application.WorkspaceAccessService
@@ -34,6 +35,7 @@ class CalendarQueryService(
 					sourceType = it.sourceType,
 					sourceId = it.sourceId,
 					visibility = it.visibility,
+					colorPreset = it.colorPreset,
 					busy = it.busy,
 				)
 			}
@@ -70,5 +72,6 @@ data class CalendarItem(
 	val sourceType: CalendarBlockSourceType,
 	val sourceId: UUID,
 	val visibility: CalendarVisibility,
+	val colorPreset: CalendarColorPreset,
 	val busy: Boolean,
 )
