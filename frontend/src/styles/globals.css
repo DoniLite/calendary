@@ -1,0 +1,193 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  font-family:
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color-scheme: light;
+  --radius: 8px;
+  --shadow: 28 27 25;
+}
+
+html,
+body {
+  min-height: 100%;
+  margin: 0;
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+  letter-spacing: 0;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+[data-theme="solar-orange"] {
+  color-scheme: light;
+  --background: 38 41% 97%;
+  --foreground: 210 14% 13%;
+  --card: 0 0% 100%;
+  --card-foreground: 210 14% 13%;
+  --primary: 24 91% 54%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 207 34% 91%;
+  --secondary-foreground: 208 25% 20%;
+  --muted: 42 24% 91%;
+  --muted-foreground: 214 9% 42%;
+  --accent: 163 46% 43%;
+  --accent-foreground: 0 0% 100%;
+  --destructive: 356 72% 52%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 35 18% 82%;
+  --input: 35 18% 82%;
+  --ring: 24 91% 54%;
+  --event: 211 72% 50%;
+  --task: 158 58% 39%;
+  --project: 24 91% 54%;
+  --available: 145 49% 43%;
+  --busy: 355 69% 54%;
+}
+
+[data-theme="paper-green"] {
+  color-scheme: light;
+  --background: 78 24% 96%;
+  --foreground: 197 18% 13%;
+  --card: 0 0% 100%;
+  --card-foreground: 197 18% 13%;
+  --primary: 149 50% 38%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 32 36% 90%;
+  --secondary-foreground: 31 24% 22%;
+  --muted: 84 18% 89%;
+  --muted-foreground: 196 8% 40%;
+  --accent: 25 80% 55%;
+  --accent-foreground: 0 0% 100%;
+  --destructive: 354 69% 52%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 84 14% 80%;
+  --input: 84 14% 80%;
+  --ring: 149 50% 38%;
+  --event: 207 66% 48%;
+  --task: 149 50% 38%;
+  --project: 30 78% 50%;
+  --available: 154 44% 42%;
+  --busy: 348 63% 50%;
+}
+
+[data-theme="clear-blue"] {
+  color-scheme: light;
+  --background: 210 33% 98%;
+  --foreground: 215 25% 15%;
+  --card: 0 0% 100%;
+  --card-foreground: 215 25% 15%;
+  --primary: 207 77% 48%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 170 28% 90%;
+  --secondary-foreground: 191 28% 20%;
+  --muted: 214 22% 91%;
+  --muted-foreground: 215 11% 43%;
+  --accent: 31 86% 53%;
+  --accent-foreground: 0 0% 100%;
+  --destructive: 356 70% 52%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 211 22% 83%;
+  --input: 211 22% 83%;
+  --ring: 207 77% 48%;
+  --event: 207 77% 48%;
+  --task: 166 55% 36%;
+  --project: 29 82% 52%;
+  --available: 146 45% 40%;
+  --busy: 356 67% 53%;
+}
+
+[data-theme="ember-dark"] {
+  color-scheme: dark;
+  --background: 220 14% 10%;
+  --foreground: 36 28% 92%;
+  --card: 220 13% 13%;
+  --card-foreground: 36 28% 92%;
+  --primary: 24 91% 56%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 218 15% 18%;
+  --secondary-foreground: 36 28% 88%;
+  --muted: 220 12% 18%;
+  --muted-foreground: 35 11% 66%;
+  --accent: 171 48% 44%;
+  --accent-foreground: 214 30% 10%;
+  --destructive: 358 70% 55%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 219 12% 24%;
+  --input: 219 12% 24%;
+  --ring: 24 91% 56%;
+  --event: 206 69% 58%;
+  --task: 158 52% 47%;
+  --project: 24 91% 56%;
+  --available: 149 50% 45%;
+  --busy: 358 70% 55%;
+}
+
+[data-theme="graphite-cyan"] {
+  color-scheme: dark;
+  --background: 210 11% 11%;
+  --foreground: 195 22% 92%;
+  --card: 210 10% 15%;
+  --card-foreground: 195 22% 92%;
+  --primary: 187 78% 47%;
+  --primary-foreground: 210 16% 10%;
+  --secondary: 219 12% 20%;
+  --secondary-foreground: 195 22% 90%;
+  --muted: 210 9% 21%;
+  --muted-foreground: 198 10% 66%;
+  --accent: 31 84% 57%;
+  --accent-foreground: 210 16% 10%;
+  --destructive: 356 68% 56%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 210 9% 26%;
+  --input: 210 9% 26%;
+  --ring: 187 78% 47%;
+  --event: 206 72% 58%;
+  --task: 151 52% 45%;
+  --project: 31 84% 57%;
+  --available: 148 50% 44%;
+  --busy: 356 68% 56%;
+}
+
+[data-theme="plum-night"] {
+  color-scheme: dark;
+  --background: 240 13% 11%;
+  --foreground: 260 18% 92%;
+  --card: 240 12% 15%;
+  --card-foreground: 260 18% 92%;
+  --primary: 272 62% 62%;
+  --primary-foreground: 250 28% 10%;
+  --secondary: 222 16% 20%;
+  --secondary-foreground: 260 18% 90%;
+  --muted: 246 12% 21%;
+  --muted-foreground: 258 10% 68%;
+  --accent: 29 84% 58%;
+  --accent-foreground: 250 28% 10%;
+  --destructive: 353 67% 57%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 247 12% 27%;
+  --input: 247 12% 27%;
+  --ring: 272 62% 62%;
+  --event: 205 68% 59%;
+  --task: 152 50% 46%;
+  --project: 272 62% 62%;
+  --available: 147 49% 44%;
+  --busy: 353 67% 57%;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  ::selection {
+    background: hsl(var(--primary) / 0.22);
+  }
+}
