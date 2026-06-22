@@ -1,1 +1,1 @@
-rootProject.name = "personal-calendar"
+rootProject.name = "calendary"
