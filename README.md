@@ -124,6 +124,19 @@ export CALENDARY_B2_BUCKET_ID=...
 export CALENDARY_B2_BUCKET_NAME=...
 ```
 
+Google Meet pour les bookings :
+
+Par defaut, `CALENDARY_GOOGLE_CALENDAR_ENABLED=false`. Dans ce mode, accepter un booking cree seulement l'evenement local Calendary. Pour creer aussi une reunion Google Meet via Google Calendar API :
+
+```bash
+export CALENDARY_GOOGLE_CALENDAR_ENABLED=true
+export CALENDARY_GOOGLE_CALENDAR_ID=primary
+export CALENDARY_GOOGLE_SERVICE_ACCOUNT_EMAIL=...
+export CALENDARY_GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY='-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n'
+```
+
+Le calendrier cible doit etre accessible au service account, par exemple en partageant le calendrier Google avec l'email du service account.
+
 Les tests peuvent etre lances avec :
 
 ```bash
@@ -150,8 +163,21 @@ bun run dev
 L'interface est disponible sur :
 
 ```text
-http://localhost:5173/calendar
+http://localhost:5173/p/doni/calendar
 ```
+
+Le flow normal commence par les pages publiques. Utiliser `Login` dans le header public pour acceder a l'application authentifiee.
+
+Le bootstrap du premier super admin est volontairement separe sur `/bootstrap` et demande une confirmation explicite. Ne l'utiliser que pour initialiser un serveur sans compte proprietaire.
+
+Par defaut, le frontend peut tourner avec des donnees mock pour permettre le travail UI sans seed backend. Une fois connecte, le workspace actif vient de la session. Pour forcer un workspace en dev sans session, renseigner l'id du workspace :
+
+```bash
+export VITE_CALENDARY_WORKSPACE_ID=<workspace-uuid>
+bun run dev
+```
+
+Le proxy Vite envoie `/api`, `/public` et `/ws` vers le backend local `http://localhost:8080`.
 
 Verifier le frontend :
 

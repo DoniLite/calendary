@@ -9,14 +9,13 @@ type ThemeContextValue = {
 const ThemeContext = createContext<ThemeContextValue | null>(null)
 
 export function ThemeProvider({ children }: PropsWithChildren) {
-  const [themeId, setThemeId] = useState<ThemeId>(defaultTheme)
-
-  useEffect(() => {
-    const stored = window.localStorage.getItem('calendary.theme') as ThemeId | null
-    if (stored && themes.some((theme) => theme.id === stored)) {
-      setThemeId(stored)
+  const [themeId, setThemeId] = useState<ThemeId>(() => {
+    if (typeof document === 'undefined') {
+      return defaultTheme
     }
-  }, [])
+    const current = document.documentElement.dataset.theme as ThemeId | undefined
+    return current && themes.some((theme) => theme.id === current) ? current : defaultTheme
+  })
 
   useEffect(() => {
     const theme = themes.find((item) => item.id === themeId) ?? themes[0]

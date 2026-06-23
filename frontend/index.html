@@ -1,8 +1,38 @@
 <!doctype html>
-<html lang="fr">
+<html lang="fr" data-theme="solar-orange" data-mode="light">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="/favicon.ico" />
+    <style>
+      html[data-theme="solar-orange"] body { background: hsl(38 41% 97%); color: hsl(210 14% 13%); }
+      html[data-theme="paper-green"] body { background: hsl(78 24% 96%); color: hsl(197 18% 13%); }
+      html[data-theme="clear-blue"] body { background: hsl(210 33% 98%); color: hsl(215 25% 15%); }
+      html[data-theme="ember-dark"] body { background: hsl(220 14% 10%); color: hsl(36 28% 92%); }
+      html[data-theme="graphite-cyan"] body { background: hsl(210 11% 11%); color: hsl(195 22% 92%); }
+      html[data-theme="plum-night"] body { background: hsl(240 13% 11%); color: hsl(260 18% 92%); }
+    </style>
+    <script>
+      (function () {
+        try {
+          var themes = {
+            "solar-orange": "light",
+            "paper-green": "light",
+            "clear-blue": "light",
+            "ember-dark": "dark",
+            "graphite-cyan": "dark",
+            "plum-night": "dark"
+          };
+          var theme = localStorage.getItem("calendary.theme") || "solar-orange";
+          if (!themes[theme]) theme = "solar-orange";
+          document.documentElement.dataset.theme = theme;
+          document.documentElement.dataset.mode = themes[theme];
+        } catch (error) {
+          document.documentElement.dataset.theme = "solar-orange";
+          document.documentElement.dataset.mode = "light";
+        }
+      })();
+    </script>
     <title>Calendary</title>
   </head>
   <body>

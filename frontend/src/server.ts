@@ -25,6 +25,11 @@ if (!isProduction) {
 app.use(async (request, response, next) => {
     const url = request.originalUrl
 
+    if (url === '/app') {
+        response.redirect(302, '/app/calendar')
+        return
+    }
+
     try {
         const templatePath = isProduction ? 'dist/client/index.html' : 'index.html'
         let template = await fs.readFile(path.resolve(root, templatePath), 'utf-8')
