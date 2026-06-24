@@ -1,0 +1,58 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-calendary}
+      POSTGRES_USER: ${POSTGRES_USER:-calendary}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - calendary-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-calendary}']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  backend:
+    image: ghcr.io/${GHCR_OWNER}/calendary-backend:${IMAGE_TAG:-latest}
+    environment:
+      CALENDARY_DATABASE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-calendary}
+      CALENDARY_DATABASE_USERNAME: ${POSTGRES_USER:-calendary}
+      CALENDARY_DATABASE_PASSWORD: ${POSTGRES_PASSWORD}
+      CALENDARY_MAIL_FROM: ${CALENDARY_MAIL_FROM}
+      CALENDARY_MAIL_REPLY_TO: ${CALENDARY_MAIL_REPLY_TO}
+      CALENDARY_PUBLIC_BASE_URL: ${CALENDARY_PUBLIC_BASE_URL}
+      SPRING_MAIL_HOST: ${SPRING_MAIL_HOST}
+      SPRING_MAIL_PORT: ${SPRING_MAIL_PORT}
+      SPRING_MAIL_USERNAME: ${SPRING_MAIL_USERNAME}
+      SPRING_MAIL_PASSWORD: ${SPRING_MAIL_PASSWORD}
+      CALENDARY_B2_ENABLED: ${CALENDARY_B2_ENABLED:-false}
+      CALENDARY_B2_KEY_ID: ${CALENDARY_B2_KEY_ID}
+      CALENDARY_B2_APPLICATION_KEY: ${CALENDARY_B2_APPLICATION_KEY}
+      CALENDARY_B2_BUCKET_ID: ${CALENDARY_B2_BUCKET_ID}
+      CALENDARY_B2_BUCKET_NAME: ${CALENDARY_B2_BUCKET_NAME}
+      CALENDARY_B2_DOWNLOAD_TTL_SECONDS: ${CALENDARY_B2_DOWNLOAD_TTL_SECONDS:-900}
+      CALENDARY_GOOGLE_CALENDAR_ENABLED: ${CALENDARY_GOOGLE_CALENDAR_ENABLED:-false}
+      CALENDARY_GOOGLE_CALENDAR_ID: ${CALENDARY_GOOGLE_CALENDAR_ID}
+      CALENDARY_GOOGLE_SERVICE_ACCOUNT_EMAIL: ${CALENDARY_GOOGLE_SERVICE_ACCOUNT_EMAIL}
+      CALENDARY_GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY: ${CALENDARY_GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    expose:
+      - '8080'
+    restart: unless-stopped
+
+  frontend:
+    image: ghcr.io/${GHCR_OWNER}/calendary-frontend:${IMAGE_TAG:-latest}
+    environment:
+      PORT: 3000
+    depends_on:
+      - backend
+    expose:
+      - '3000'
+    restart: unless-stopped
+
+volumes:
+  calendary-postgres-data:

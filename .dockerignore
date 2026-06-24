@@ -1,0 +1,9 @@
+.git
+.gradle
+build/
+frontend/
+.idea
+.vscode
+*.md
+.env
+local.properties
