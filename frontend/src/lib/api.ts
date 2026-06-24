@@ -105,6 +105,9 @@ export type TaskResponse = {
   epicId: string | null
   parentTaskId: string | null
   estimateMinutes: number | null
+  plannedStart: string | null
+  plannedEnd: string | null
+  timezone: string | null
   assignees: MemberSummaryResponse[]
 }
 

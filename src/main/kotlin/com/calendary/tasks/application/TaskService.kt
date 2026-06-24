@@ -35,7 +35,7 @@ class TaskService(
 	private val notifications: NotificationService,
 ) {
 	@Transactional
-	fun create(command: CreateTaskCommand): Task {
+	fun create(command: CreateTaskCommand): TaskWithSchedule {
 		require(command.title.isNotBlank()) { "Task title is required." }
 		if (command.plannedStart != null || command.plannedEnd != null) {
 			require(command.plannedStart != null && command.plannedEnd != null) { "Task planning requires start and end." }
@@ -94,26 +94,36 @@ class TaskService(
 		}
 		syncAssignees(task, command.assigneeEmails, creator)
 		initializeAssignees(task)
-		return task
+		val block = if (command.plannedStart != null && command.plannedEnd != null) {
+			calendarBlocks.findBySourceTypeAndSourceId(CalendarBlockSourceType.TASK, task.id).orElse(null)
+		} else {
+			null
+		}
+		return TaskWithSchedule(task, block)
 	}
 
 	@Transactional(readOnly = true)
-	fun list(workspaceId: UUID, userId: UUID): List<Task> {
+	fun list(workspaceId: UUID, userId: UUID): List<TaskWithSchedule> {
 		workspaceAccess.requireRead(workspaceId, userId)
-		return tasks.findByWorkspaceIdOrderByCreatedAtDesc(workspaceId)
+		val found = tasks.findByWorkspaceIdOrderByCreatedAtDesc(workspaceId)
 			.onEach { initializeAssignees(it) }
+		val blocksBySourceId = calendarBlocks.findBySourceTypeAndSourceIdIn(CalendarBlockSourceType.TASK, found.map { it.id })
+			.associateBy { it.sourceId }
+		return found.map { TaskWithSchedule(it, blocksBySourceId[it.id]) }
 	}
 
 	@Transactional(readOnly = true)
-	fun get(workspaceId: UUID, taskId: UUID, userId: UUID): Task {
+	fun get(workspaceId: UUID, taskId: UUID, userId: UUID): TaskWithSchedule {
 		workspaceAccess.requireRead(workspaceId, userId)
-		return tasks.findByIdAndWorkspaceId(taskId, workspaceId)
+		val task = tasks.findByIdAndWorkspaceId(taskId, workspaceId)
 			.orElseThrow { IllegalArgumentException("Task not found.") }
 			.also { initializeAssignees(it) }
+		val block = calendarBlocks.findBySourceTypeAndSourceIdAndWorkspaceId(CalendarBlockSourceType.TASK, task.id, workspaceId).orElse(null)
+		return TaskWithSchedule(task, block)
 	}
 
 	@Transactional
-	fun update(command: UpdateTaskCommand): Task {
+	fun update(command: UpdateTaskCommand): TaskWithSchedule {
 		require(command.title.isNotBlank()) { "Task title is required." }
 		if (command.plannedStart != null || command.plannedEnd != null) {
 			require(command.plannedStart != null && command.plannedEnd != null) { "Task planning requires start and end." }
@@ -152,7 +162,7 @@ class TaskService(
 		task.estimateMinutes = command.estimateMinutes
 
 		val existingBlock = calendarBlocks.findBySourceTypeAndSourceId(CalendarBlockSourceType.TASK, task.id)
-		if (command.plannedStart != null && command.plannedEnd != null) {
+		val resultBlock = if (command.plannedStart != null && command.plannedEnd != null) {
 			val block = existingBlock.orElseGet {
 				CalendarBlock(
 					workspace = workspace,
@@ -170,24 +180,27 @@ class TaskService(
 			if (existingBlock.isEmpty) {
 				calendarBlocks.save(block)
 			}
+			block
 		} else {
 			existingBlock.ifPresent { calendarBlocks.delete(it) }
+			null
 		}
 		syncAssignees(task, command.assigneeEmails, actor)
 		initializeAssignees(task)
-		return task
+		return TaskWithSchedule(task, resultBlock)
 	}
 
 	@Transactional
-	fun updateStatus(workspaceId: UUID, taskId: UUID, userId: UUID, status: TaskStatus): Task {
+	fun updateStatus(workspaceId: UUID, taskId: UUID, userId: UUID, status: TaskStatus): TaskWithSchedule {
 		workspaceAccess.requireWrite(workspaceId, userId)
 		val task = tasks.findByIdAndWorkspaceId(taskId, workspaceId)
 			.orElseThrow { IllegalArgumentException("Task not found.") }
 		task.status = status
-		calendarBlocks.findBySourceTypeAndSourceId(CalendarBlockSourceType.TASK, task.id)
-			.ifPresent { it.busy = status != TaskStatus.DONE && status != TaskStatus.ARCHIVED }
+		val block = calendarBlocks.findBySourceTypeAndSourceId(CalendarBlockSourceType.TASK, task.id)
+			.map { it.also { found -> found.busy = status != TaskStatus.DONE && status != TaskStatus.ARCHIVED } }
+			.orElse(null)
 		initializeAssignees(task)
-		return task
+		return TaskWithSchedule(task, block)
 	}
 
 	private fun initializeAssignees(task: Task) {
@@ -235,6 +248,11 @@ class TaskService(
 		tasks.delete(task)
 	}
 }
+
+data class TaskWithSchedule(
+	val task: Task,
+	val block: CalendarBlock?,
+)
 
 data class CreateTaskCommand(
 	val workspaceId: UUID,

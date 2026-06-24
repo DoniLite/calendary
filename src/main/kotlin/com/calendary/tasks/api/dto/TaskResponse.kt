@@ -25,10 +25,15 @@ data class TaskResponse(
 	val epicId: UUID?,
 	val parentTaskId: UUID?,
 	val estimateMinutes: Int?,
+	// Sourced from the task's CalendarBlock (see CalendarBlockRepository) — a task only has one
+	// if it was given a planned execution window; it isn't stored on the Task entity itself.
+	val plannedStart: Instant?,
+	val plannedEnd: Instant?,
+	val timezone: String?,
 	val assignees: List<MemberSummaryResponse>,
 )
 
-fun Task.toResponse(): TaskResponse =
+fun Task.toResponse(plannedStart: Instant? = null, plannedEnd: Instant? = null, timezone: String? = null): TaskResponse =
 	TaskResponse(
 		id = id,
 		workspaceId = workspace?.id ?: error("Task has no workspace."),
@@ -43,5 +48,8 @@ fun Task.toResponse(): TaskResponse =
 		epicId = epic?.id,
 		parentTaskId = parentTask?.id,
 		estimateMinutes = estimateMinutes,
+		plannedStart = plannedStart,
+		plannedEnd = plannedEnd,
+		timezone = timezone,
 		assignees = assignees.mapNotNull { it.user }.map { it.toSummary() },
 	)
