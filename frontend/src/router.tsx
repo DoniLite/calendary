@@ -29,6 +29,7 @@ import { SettingsView } from './features/settings/settings-view'
 import { useWorkspaceSession } from './features/auth/workspace-session'
 import { InboxView } from './features/inbox/inbox-view'
 import { CollaboratorsView } from './features/collaborators/collaborators-view'
+import { fallbackPublicSlug } from './lib/api'
 
 const rootRoute = createRootRoute({
   component: () => <Outlet />,
@@ -38,7 +39,7 @@ const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/',
   beforeLoad: () => {
-    throw redirect({ to: '/p/doni/calendar' })
+    throw redirect({ to: '/p/$publicSlug/calendar', params: { publicSlug: fallbackPublicSlug } })
   },
 })
 
@@ -264,35 +265,35 @@ const publicRoute = createRoute({
   component: PublicShell,
 })
 
-const publicDoniRoute = createRoute({
+const publicSlugRoute = createRoute({
   getParentRoute: () => publicRoute,
-  path: '/doni',
-  beforeLoad: () => {
-    throw redirect({ to: '/p/doni/calendar' })
+  path: '/$publicSlug',
+  beforeLoad: ({ params }) => {
+    throw redirect({ to: '/p/$publicSlug/calendar', params: { publicSlug: params.publicSlug } })
   },
 })
 
 const publicCalendarRoute = createRoute({
   getParentRoute: () => publicRoute,
-  path: '/doni/calendar',
+  path: '/$publicSlug/calendar',
   component: PublicCalendarPage,
 })
 
 const publicCalendarEntryRoute = createRoute({
   getParentRoute: () => publicRoute,
-  path: '/doni/calendar/$entryId',
+  path: '/$publicSlug/calendar/$entryId',
   component: PublicCalendarEntryPage,
 })
 
 const publicAvailabilityRoute = createRoute({
   getParentRoute: () => publicRoute,
-  path: '/doni/availability',
+  path: '/$publicSlug/availability',
   component: PublicAvailabilityPage,
 })
 
 const publicRequestRoute = createRoute({
   getParentRoute: () => publicRoute,
-  path: '/doni/request',
+  path: '/$publicSlug/request',
   component: PublicRequestPage,
 })
 
@@ -433,7 +434,7 @@ const routeTree = rootRoute.addChildren([
     eventDetailRoute,
     eventEditRoute,
   ]),
-  publicRoute.addChildren([publicDoniRoute, publicCalendarRoute, publicCalendarEntryRoute, publicAvailabilityRoute, publicRequestRoute]),
+  publicRoute.addChildren([publicSlugRoute, publicCalendarRoute, publicCalendarEntryRoute, publicAvailabilityRoute, publicRequestRoute]),
   collaboratorRoute.addChildren([
     collaboratorIndexRoute,
     collaboratorCalendarRoute,

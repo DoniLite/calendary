@@ -1,21 +1,16 @@
+import { zodResolver } from '@hookform/resolvers/zod'
 import { CalendarPlus, Check, Clock, Mail, MessageSquare, User, Video, X } from 'lucide-react'
 import type { ComponentType, ReactNode } from 'react'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
+import { useForm } from 'react-hook-form'
 import { Badge } from '../../components/ui/badge'
 import { Button } from '../../components/ui/button'
+import { FieldError } from '../../components/ui/form-field'
 import { Panel, PanelBody, PanelHeader, PanelTitle } from '../../components/ui/panel'
 import { useWorkspaceSession } from '../auth/workspace-session'
-import { useBookingRequestsQuery, useInboxMutations, type BookingRequestResponse } from '../../lib/api'
-import { bookingRequests } from '../../lib/demo-data'
+import { useBookingRequestsQuery, useInboxMutations, usePublicAvailabilityQuery, usePublicBookingMutation, type BookingRequestResponse } from '../../lib/api'
+import { bookingRequestSchema, type BookingRequestFormValues } from '../../lib/schemas'
 import { formatTimeInTimezone } from '../../lib/timezone'
-
-const slots = [
-  { id: 'slot-1', label: 'Today 09:30', startsAt: '2026-07-01T09:30:00Z', endsAt: '2026-07-01T10:00:00Z' },
-  { id: 'slot-2', label: 'Today 11:30', startsAt: '2026-07-01T11:30:00Z', endsAt: '2026-07-01T12:00:00Z' },
-  { id: 'slot-3', label: 'Today 16:00', startsAt: '2026-07-01T16:00:00Z', endsAt: '2026-07-01T16:30:00Z' },
-  { id: 'slot-4', label: 'Friday 10:00', startsAt: '2026-07-03T10:00:00Z', endsAt: '2026-07-03T10:30:00Z' },
-  { id: 'slot-5', label: 'Friday 14:30', startsAt: '2026-07-03T14:30:00Z', endsAt: '2026-07-03T15:00:00Z' },
-]
 
 const timezones = ['Europe/Paris', 'UTC', 'Africa/Abidjan', 'America/New_York', 'Asia/Tokyo']
 
@@ -24,12 +19,40 @@ export function BookingView() {
   const canWrite = activeWorkspace?.accessLevel !== 'READ'
   const bookingRequestsQuery = useBookingRequestsQuery(activeWorkspaceId)
   const mutations = useInboxMutations(activeWorkspaceId)
-  const [selectedSlot, setSelectedSlot] = useState(slots[2].id)
-  const [timezone, setTimezone] = useState('Europe/Paris')
+  const bookingMutation = usePublicBookingMutation(activeWorkspaceId)
+  const weekStart = useMemo(() => startOfWeek(new Date()), [])
+  const availabilityQuery = usePublicAvailabilityQuery(activeWorkspaceId, weekStart, addDays(weekStart, 7))
+  const [selectedSlot, setSelectedSlot] = useState<string>()
   const [submitted, setSubmitted] = useState(false)
-  const visibleSlots = slots.map((item) => ({ ...item, label: formatSlotLabel(item.startsAt, timezone) }))
+  const {
+    register,
+    handleSubmit,
+    watch,
+    formState: { errors },
+  } = useForm<BookingRequestFormValues>({
+    resolver: zodResolver(bookingRequestSchema),
+    defaultValues: { name: '', email: '', timezone: 'Europe/Paris', message: '' },
+  })
+  const timezone = watch('timezone')
+  const visibleSlots = (availabilityQuery.data?.slots ?? [])
+    .filter((item) => item.available)
+    .map((item, index) => ({ id: `slot-${index}`, label: formatSlotLabel(item.startsAt, timezone), startsAt: item.startsAt, endsAt: item.endsAt }))
   const slot = visibleSlots.find((item) => item.id === selectedSlot) ?? visibleSlots[0]
-  const queue = apiEnabled && bookingRequestsQuery.data ? bookingRequestsQuery.data.items.map((item) => toQueueItem(item, timezone)) : bookingRequests
+  const queue = bookingRequestsQuery.data?.items.map((item) => toQueueItem(item, timezone)) ?? []
+
+  function onSubmit(values: BookingRequestFormValues) {
+    if (!apiEnabled || !activeWorkspaceId || !slot) {
+      return
+    }
+    bookingMutation.mutate({
+      requesterName: values.name,
+      requesterEmail: values.email,
+      message: values.message,
+      startsAt: slot.startsAt,
+      endsAt: slot.endsAt,
+      timezone: values.timezone,
+    }, { onSuccess: () => setSubmitted(true) })
+  }
 
   return (
     <div className="space-y-5">
@@ -54,6 +77,10 @@ export function BookingView() {
               <PanelTitle>Public availability</PanelTitle>
             </PanelHeader>
             <PanelBody className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {availabilityQuery.isPending && <div className="rounded-md border bg-muted/40 px-4 py-3 text-sm text-muted-foreground sm:col-span-2 xl:col-span-3">Loading availability...</div>}
+              {!availabilityQuery.isPending && !visibleSlots.length && (
+                <div className="rounded-md border bg-muted/40 px-4 py-3 text-sm text-muted-foreground sm:col-span-2 xl:col-span-3">No available slots this week.</div>
+              )}
               {visibleSlots.map((item) => (
                 <button
                   key={item.id}
@@ -90,24 +117,23 @@ export function BookingView() {
                   </p>
                 </div>
               ) : (
-                <form className="grid gap-4" onSubmit={(event) => {
-                  event.preventDefault()
-                  setSubmitted(true)
-                }}>
+                <form className="grid gap-4" onSubmit={handleSubmit(onSubmit)}>
                   <div className="grid gap-4 md:grid-cols-2">
                     <Field icon={User} label="Name">
-                      <input className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" required placeholder="Ada Lovelace" />
+                      <input className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" placeholder="Ada Lovelace" {...register('name')} />
+                      <FieldError message={errors.name?.message} />
                     </Field>
                     <Field icon={Mail} label="Email">
-                      <input className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" required type="email" placeholder="ada@example.com" />
+                      <input className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" type="email" placeholder="ada@example.com" {...register('email')} />
+                      <FieldError message={errors.email?.message} />
                     </Field>
                   </div>
                   <div className="grid gap-4 md:grid-cols-2">
                     <Field icon={CalendarPlus} label="Selected slot">
-                      <input className="h-10 w-full rounded-md border bg-muted px-3 text-sm text-muted-foreground outline-none" readOnly value={slot.label} />
+                      <input className="h-10 w-full rounded-md border bg-muted px-3 text-sm text-muted-foreground outline-none" readOnly value={slot?.label ?? 'No slot selected'} />
                     </Field>
                     <Field icon={Clock} label="Timezone">
-                      <select className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" value={timezone} onChange={(event) => setTimezone(event.target.value)}>
+                      <select className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" {...register('timezone')}>
                         {timezones.map((value) => (
                           <option key={value} value={value}>
                             {value}
@@ -117,11 +143,12 @@ export function BookingView() {
                     </Field>
                   </div>
                   <Field icon={MessageSquare} label="Message">
-                    <textarea className="min-h-24 w-full resize-y rounded-md border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring" placeholder="Context, topic, questions..." />
+                    <textarea className="min-h-24 w-full resize-y rounded-md border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring" placeholder="Context, topic, questions..." {...register('message')} />
                   </Field>
-                  <Button className="w-full sm:w-fit">
+                  {bookingMutation.isError && <div className="rounded-md border border-busy/30 bg-busy/10 px-3 py-2 text-sm">Unable to send this booking request.</div>}
+                  <Button className="w-full sm:w-fit" disabled={bookingMutation.isPending || !slot}>
                     <CalendarPlus className="h-4 w-4" aria-hidden />
-                    Request booking
+                    {bookingMutation.isPending ? 'Sending' : 'Request booking'}
                   </Button>
                 </form>
               )}
@@ -134,9 +161,10 @@ export function BookingView() {
             <PanelTitle>Decision queue</PanelTitle>
           </PanelHeader>
           <PanelBody className="space-y-3">
+            {!apiEnabled && <div className="rounded-md border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">Select a workspace to load booking requests.</div>}
             {apiEnabled && bookingRequestsQuery.isPending && <div className="rounded-md border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">Loading booking requests...</div>}
             {apiEnabled && bookingRequestsQuery.isError && <div className="rounded-md border border-busy/30 bg-busy/10 px-4 py-3 text-sm">Unable to load booking requests.</div>}
-            {!bookingRequestsQuery.isPending && !queue.length && <div className="rounded-md border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">No booking requests for this workspace.</div>}
+            {apiEnabled && !bookingRequestsQuery.isPending && !queue.length && <div className="rounded-md border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">No booking requests for this workspace.</div>}
             {queue.map((request) => (
               <article key={request.id} className="rounded-md border p-3">
                 <div className="flex items-start justify-between gap-3">
@@ -187,6 +215,20 @@ function toQueueItem(request: BookingRequestResponse, timezone: string) {
 
 function formatSlotLabel(value: string, timezone: string) {
   return new Intl.DateTimeFormat(undefined, { weekday: 'short', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: timezone }).format(new Date(value))
+}
+
+function startOfWeek(date: Date) {
+  const value = new Date(date)
+  value.setHours(0, 0, 0, 0)
+  const day = value.getDay()
+  value.setDate(value.getDate() - (day === 0 ? 6 : day - 1))
+  return value
+}
+
+function addDays(date: Date, days: number) {
+  const value = new Date(date)
+  value.setDate(value.getDate() + days)
+  return value
 }
 
 function Field({ icon: Icon, label, children }: { icon: ComponentType<{ className?: string; 'aria-hidden'?: boolean }>; label: string; children: ReactNode }) {

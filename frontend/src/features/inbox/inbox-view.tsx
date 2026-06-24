@@ -139,7 +139,7 @@ function BookingCard({ request, canWrite, onAccept, onReject }: { request: Booki
   )
 }
 
-function CollaborationPanel({ title, items, direction, mutations }: { title: string; items: CollaborationResponse[]; direction: 'inbox' | 'sent'; mutations: ReturnType<typeof useInboxMutations> }) {
+export function CollaborationPanel({ title, items, direction, mutations }: { title: string; items: CollaborationResponse[]; direction: 'inbox' | 'sent'; mutations: ReturnType<typeof useInboxMutations> }) {
   return (
     <Panel>
       <PanelHeader>
@@ -190,7 +190,7 @@ function Summary({ title, value }: { title: string; value: string }) {
   )
 }
 
-function EmptyState({ label }: { label: string }) {
+export function EmptyState({ label }: { label: string }) {
   return <div className="rounded-md border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">{label}</div>
 }
 

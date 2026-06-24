@@ -6,5 +6,5 @@ import java.util.UUID
 import org.springframework.data.jpa.repository.JpaRepository
 
 interface EventRepository : JpaRepository<Event, UUID> {
-	fun findByIdAndWorkspaceId(id: UUID, workspaceId: UUID): Optional<Event>
+	fun findFirstByIdAndWorkspaceId(id: UUID, workspaceId: UUID): Optional<Event>
 }

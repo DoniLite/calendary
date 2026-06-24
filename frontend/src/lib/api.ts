@@ -1,6 +1,7 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 
 export const fallbackWorkspaceId = import.meta.env.VITE_CALENDARY_WORKSPACE_ID?.trim() || ''
+export const fallbackPublicSlug = import.meta.env.VITE_CALENDARY_PUBLIC_SLUG?.trim() || 'doni'
 
 export type CalendarColorPreset = 'ORANGE' | 'BLUE' | 'GREEN' | 'ROSE' | 'VIOLET' | 'SLATE' | 'AMBER'
 export type CalendarVisibility = 'PRIVATE' | 'PUBLIC'
@@ -28,6 +29,8 @@ export type AuthenticatedUserResponse = {
 export type WorkspaceResponse = {
   id: string
   name: string
+  publicSlug: string
+  defaultTimezone: string
   type: 'PERSONAL'
   accessLevel: WorkspaceAccessLevel
   ownerId: string
@@ -35,6 +38,19 @@ export type WorkspaceResponse = {
 
 export type WorkspaceListResponse = {
   items: WorkspaceResponse[]
+}
+
+export type PublicWorkspaceProfileResponse = {
+  id: string
+  name: string
+  publicSlug: string
+  defaultTimezone: string
+}
+
+export type UpdateWorkspaceSettingsPayload = {
+  name: string
+  publicSlug: string
+  defaultTimezone: string
 }
 
 export type LoginPayload = {
@@ -73,6 +89,11 @@ export type CalendarColorResponse = {
   border: string
 }
 
+export type MemberSummaryResponse = {
+  id: string
+  email: string
+}
+
 export type TaskResponse = {
   id: string
   workspaceId: string
@@ -87,6 +108,7 @@ export type TaskResponse = {
   epicId: string | null
   parentTaskId: string | null
   estimateMinutes: number | null
+  assignees: MemberSummaryResponse[]
 }
 
 export type TaskListResponse = {
@@ -124,6 +146,7 @@ export type EventResponse = {
   visibility: CalendarVisibility
   color: CalendarColorResponse
   status: EventStatus
+  participants: MemberSummaryResponse[]
 }
 
 export type CalendarItemResponse = {
@@ -151,6 +174,7 @@ export type PublicCalendarItemResponse = {
   endsAt: string
   busy: boolean
   public: boolean
+  sourceId: string | null
   title: string | null
   sourceType: CalendarBlockSourceType | null
   color: CalendarColorResponse | null
@@ -284,6 +308,7 @@ export type UpsertTaskPayload = {
   plannedStart?: string | null
   plannedEnd?: string | null
   timezone: string
+  assigneeEmails?: string[]
 }
 
 export type UpsertProjectPayload = {
@@ -307,6 +332,7 @@ export type UpsertEventPayload = {
   visibility: CalendarVisibility
   colorPreset: CalendarColorPreset
   status?: EventStatus
+  participantEmails?: string[]
 }
 
 export async function apiGet<T>(path: string): Promise<T> {
@@ -376,16 +402,16 @@ export function useCalendarQuery(workspaceId: string | undefined, start: Date, e
   return useApiQuery<CalendarResponse>(['calendar', workspaceId ?? 'none', startIso, endIso], `/api/workspaces/${workspaceId}/calendar${query}`, Boolean(workspaceId))
 }
 
+export function usePublicWorkspaceProfileQuery(publicSlug?: string) {
+  return useApiQuery<PublicWorkspaceProfileResponse>(['public-profile', publicSlug ?? 'none'], `/public/profiles/${publicSlug}`, Boolean(publicSlug))
+}
+
 export function useEventQuery(workspaceId?: string, eventId?: string) {
   return useApiQuery<EventResponse>(['events', workspaceId ?? 'none', eventId ?? 'none'], `/api/workspaces/${workspaceId}/events/${eventId}`, Boolean(workspaceId && eventId))
 }
 
 export function useTaskQuery(workspaceId?: string, taskId?: string) {
-  const tasksQuery = useTasksQuery(workspaceId)
-  return {
-    ...tasksQuery,
-    data: tasksQuery.data?.items.find((task) => task.id === taskId),
-  }
+  return useApiQuery<TaskResponse>(['tasks', workspaceId ?? 'none', taskId ?? 'none'], `/api/workspaces/${workspaceId}/tasks/${taskId}`, Boolean(workspaceId && taskId))
 }
 
 export function useProjectQuery(workspaceId?: string, projectId?: string) {
@@ -406,6 +432,14 @@ export function usePublicAvailabilityQuery(workspaceId: string | undefined, star
   return useApiQuery<PublicAvailabilityResponse>(['public-availability', workspaceId ?? 'none', startIso, endIso, String(slotMinutes)], `/public/workspaces/${workspaceId}/availability${query}`, Boolean(workspaceId))
 }
 
+export function usePublicCalendarItemQuery(workspaceId?: string, sourceType?: CalendarBlockSourceType, sourceId?: string) {
+  return useApiQuery<PublicCalendarItemResponse>(
+    ['public-calendar-item', workspaceId ?? 'none', sourceType ?? 'none', sourceId ?? 'none'],
+    `/public/workspaces/${workspaceId}/calendar/${sourceType}/${sourceId}`,
+    Boolean(workspaceId && sourceType && sourceId),
+  )
+}
+
 export function useAttachmentQuery(resourceType?: ResourceType, resourceId?: string, enabled = true) {
   return useApiQuery<AttachmentListResponse>(['attachments', resourceType ?? 'none', resourceId ?? 'none'], `/api/resources/${resourceType}/${resourceId}/attachments`, Boolean(enabled && resourceType && resourceId))
 }
@@ -424,6 +458,26 @@ export function useCollaborationInboxQuery(enabled = true) {
 
 export function useCollaborationSentQuery(enabled = true) {
   return useApiQuery<CollaborationListResponse>(['collaborations', 'sent'], '/api/collaborations/sent', enabled)
+}
+
+export function useSharedTaskQueries(shares: CollaborationResponse[]) {
+  const taskShares = shares.filter((share) => share.resourceType === 'TASK')
+  return useQueries({
+    queries: taskShares.map((share) => ({
+      queryKey: ['shared-task', share.ownerWorkspaceId, share.resourceId],
+      queryFn: () => apiGet<TaskResponse>(`/api/workspaces/${share.ownerWorkspaceId}/tasks/${share.resourceId}`),
+    })),
+  })
+}
+
+export function useSharedProjectQueries(shares: CollaborationResponse[]) {
+  const projectShares = shares.filter((share) => share.resourceType === 'PROJECT')
+  return useQueries({
+    queries: projectShares.map((share) => ({
+      queryKey: ['shared-project', share.ownerWorkspaceId, share.resourceId],
+      queryFn: () => apiGet<ProjectResponse>(`/api/workspaces/${share.ownerWorkspaceId}/projects/${share.resourceId}`),
+    })),
+  })
 }
 
 export function useInboxMutations(workspaceId?: string) {
@@ -579,7 +633,26 @@ export function useResourceMutations(workspaceId?: string) {
     onSuccess: invalidateWorkspace,
   })
 
-  return { createTask, updateTask, createProject, updateProject, createEvent, updateEvent }
+  const updateTaskStatus = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: TaskStatus }) => apiPatch<TaskResponse>(`/api/workspaces/${requireWorkspace()}/tasks/${id}/status`, { status }),
+    onSuccess: invalidateWorkspace,
+  })
+
+  return { createTask, updateTask, updateTaskStatus, createProject, updateProject, createEvent, updateEvent }
+}
+
+export function useWorkspaceSettingsMutation(workspaceId?: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (payload: UpdateWorkspaceSettingsPayload) => {
+      if (!workspaceId) throw new Error('No active workspace selected.')
+      return apiPatch<WorkspaceResponse>(`/api/workspaces/${workspaceId}/settings`, payload)
+    },
+    onSuccess: (workspace) => {
+      void queryClient.invalidateQueries({ queryKey: ['me', 'workspaces'] })
+      void queryClient.invalidateQueries({ queryKey: ['public-profile', workspace.publicSlug] })
+    },
+  })
 }
 
 function withoutEventStatus(payload: UpsertEventPayload) {

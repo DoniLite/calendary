@@ -21,6 +21,7 @@ export const itemColors: ItemColor[] = [
 
 export type CalendarItem = {
   id: string
+  sourceId?: string
   title: string
   kind: CalendarKind
   dayIndex: number

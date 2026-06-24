@@ -5,6 +5,7 @@ import com.calendary.tasks.api.dto.CreateTaskRequest
 import com.calendary.tasks.api.dto.TaskListResponse
 import com.calendary.tasks.api.dto.TaskResponse
 import com.calendary.tasks.api.dto.UpdateTaskRequest
+import com.calendary.tasks.api.dto.UpdateTaskStatusRequest
 import com.calendary.tasks.api.dto.toResponse
 import com.calendary.tasks.application.CreateTaskCommand
 import com.calendary.tasks.application.TaskService
@@ -55,6 +56,7 @@ class TaskController(
 				plannedStart = request.plannedStart,
 				plannedEnd = request.plannedEnd,
 				timezone = request.timezone,
+				assigneeEmails = request.assigneeEmails,
 			),
 		).toResponse()
 	}
@@ -66,6 +68,16 @@ class TaskController(
 	): TaskListResponse {
 		val currentUser = sessions.currentUser(httpRequest.getSession(false))
 		return tasks.list(workspaceId, currentUser.id).toResponse()
+	}
+
+	@GetMapping("/{id}")
+	fun get(
+		@PathVariable workspaceId: UUID,
+		@PathVariable id: UUID,
+		httpRequest: HttpServletRequest,
+	): TaskResponse {
+		val currentUser = sessions.currentUser(httpRequest.getSession(false))
+		return tasks.get(workspaceId, id, currentUser.id).toResponse()
 	}
 
 	@PatchMapping("/{id}")
@@ -95,8 +107,20 @@ class TaskController(
 				plannedStart = request.plannedStart,
 				plannedEnd = request.plannedEnd,
 				timezone = request.timezone,
+				assigneeEmails = request.assigneeEmails,
 			),
 		).toResponse()
+	}
+
+	@PatchMapping("/{id}/status")
+	fun updateStatus(
+		@PathVariable workspaceId: UUID,
+		@PathVariable id: UUID,
+		@Valid @RequestBody request: UpdateTaskStatusRequest,
+		httpRequest: HttpServletRequest,
+	): TaskResponse {
+		val currentUser = sessions.currentUser(httpRequest.getSession(false))
+		return tasks.updateStatus(workspaceId, id, currentUser.id, request.status).toResponse()
 	}
 
 	@DeleteMapping("/{id}")

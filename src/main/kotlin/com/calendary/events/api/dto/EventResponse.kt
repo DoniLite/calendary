@@ -5,6 +5,8 @@ import com.calendary.calendar.api.dto.toResponse
 import com.calendary.calendar.domain.CalendarVisibility
 import com.calendary.events.domain.Event
 import com.calendary.events.domain.EventStatus
+import com.calendary.users.api.dto.MemberSummaryResponse
+import com.calendary.users.api.dto.toSummary
 import java.time.Instant
 import java.util.UUID
 
@@ -21,6 +23,7 @@ data class EventResponse(
 	val visibility: CalendarVisibility,
 	val color: CalendarColorResponse,
 	val status: EventStatus,
+	val participants: List<MemberSummaryResponse>,
 )
 
 fun Event.toResponse(): EventResponse =
@@ -37,4 +40,5 @@ fun Event.toResponse(): EventResponse =
 		visibility = visibility,
 		color = colorPreset.toResponse(),
 		status = status,
+		participants = participants.mapNotNull { it.user }.map { it.toSummary() },
 	)

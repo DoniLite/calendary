@@ -10,4 +10,8 @@ interface WorkspaceRepository : JpaRepository<Workspace, UUID> {
 	fun countByOwnerId(ownerId: UUID): Long
 
 	fun findFirstByOwnerIdAndType(ownerId: UUID, type: WorkspaceType): Optional<Workspace>
+
+	fun findByPublicSlugIgnoreCase(publicSlug: String): Optional<Workspace>
+
+	fun existsByPublicSlugIgnoreCaseAndIdNot(publicSlug: String, id: UUID): Boolean
 }

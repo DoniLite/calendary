@@ -16,4 +16,5 @@ data class UpdateEventRequest(
 	val visibility: CalendarVisibility = CalendarVisibility.PRIVATE,
 	val colorPreset: CalendarColorPreset = CalendarColorPreset.BLUE,
 	val status: EventStatus = EventStatus.CONFIRMED,
+	val participantEmails: List<String> = emptyList(),
 )

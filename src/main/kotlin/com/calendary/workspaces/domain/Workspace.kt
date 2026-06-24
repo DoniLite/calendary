@@ -17,6 +17,12 @@ open class Workspace(
 	@Column(nullable = false)
 	open var name: String = "",
 
+	@Column(name = "public_slug", nullable = false)
+	open var publicSlug: String = "",
+
+	@Column(name = "default_timezone", nullable = false)
+	open var defaultTimezone: String = "Europe/Paris",
+
 	@Enumerated(EnumType.STRING)
 	@Column(nullable = false)
 	open var type: WorkspaceType = WorkspaceType.PERSONAL,

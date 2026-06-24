@@ -1,8 +1,11 @@
 package com.calendary.workspaces
 
 import com.calendary.onboarding.application.BootstrapSuperAdminCommand
+import com.calendary.onboarding.application.AcceptInvitationCommand
+import com.calendary.onboarding.application.InviteCollaboratorCommand
 import com.calendary.onboarding.application.OnboardingService
 import com.calendary.support.PostgresIntegrationTest
+import com.calendary.workspaces.domain.WorkspaceAccessLevel
 import kotlin.test.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.http.MediaType
@@ -11,6 +14,7 @@ import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.post
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get as mvcGet
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch as mvcPatch
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import org.springframework.transaction.annotation.Transactional
@@ -34,7 +38,109 @@ class WorkspaceControllerIntegrationTests(
 		mockMvc.perform(mvcGet("/api/me/workspaces").session(session))
 			.andExpect(status().isOk)
 			.andExpect(jsonPath("$.items[0].name").value("Owner workspace"))
+			.andExpect(jsonPath("$.items[0].publicSlug").value("owner-workspace"))
+			.andExpect(jsonPath("$.items[0].defaultTimezone").value("Europe/Paris"))
 			.andExpect(jsonPath("$.items[0].accessLevel").value("OWNER"))
+	}
+
+	@Test
+	@Transactional
+	fun `updates workspace public settings and resolves public profile`() {
+		onboarding.bootstrapSuperAdmin(
+			BootstrapSuperAdminCommand(
+				email = "owner@calendary.dev",
+				password = "very-secret-password",
+				workspaceName = "Owner workspace",
+			),
+		)
+		val session = loginAs("owner@calendary.dev", "very-secret-password")
+		val workspaceId = com.jayway.jsonpath.JsonPath.read<String>(
+			mockMvc.perform(mvcGet("/api/me/workspaces").session(session))
+				.andExpect(status().isOk)
+				.andReturn()
+				.response
+				.contentAsString,
+			"$.items[0].id",
+		)
+
+		mockMvc.perform(
+			mvcPatch("/api/workspaces/$workspaceId/settings")
+				.session(session)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(
+					"""
+					{
+					  "name": "Doni Studio",
+					  "publicSlug": "doni-studio",
+					  "defaultTimezone": "Africa/Abidjan"
+					}
+					""".trimIndent(),
+				),
+		)
+			.andExpect(status().isOk)
+			.andExpect(jsonPath("$.name").value("Doni Studio"))
+			.andExpect(jsonPath("$.publicSlug").value("doni-studio"))
+			.andExpect(jsonPath("$.defaultTimezone").value("Africa/Abidjan"))
+
+		mockMvc.get("/public/profiles/doni-studio")
+			.andExpect {
+				status { isOk() }
+				jsonPath("$.id") { value(workspaceId) }
+				jsonPath("$.name") { value("Doni Studio") }
+				jsonPath("$.defaultTimezone") { value("Africa/Abidjan") }
+			}
+	}
+
+	@Test
+	@Transactional
+	fun `forbids collaborator from updating owner workspace public settings`() {
+		val owner = onboarding.bootstrapSuperAdmin(
+			BootstrapSuperAdminCommand(
+				email = "owner@calendary.dev",
+				password = "very-secret-password",
+				workspaceName = "Owner workspace",
+			),
+		)
+		val ownerSession = loginAs("owner@calendary.dev", "very-secret-password")
+		val ownerWorkspaceId = com.jayway.jsonpath.JsonPath.read<String>(
+			mockMvc.perform(mvcGet("/api/me/workspaces").session(ownerSession))
+				.andExpect(status().isOk)
+				.andReturn()
+				.response
+				.contentAsString,
+			"$.items[0].id",
+		)
+		val invitation = onboarding.inviteCollaborator(
+			InviteCollaboratorCommand(
+				email = "collab@calendary.dev",
+				invitedById = owner.id,
+				accessLevel = WorkspaceAccessLevel.WRITE,
+			),
+		)
+		onboarding.acceptInvitation(
+			AcceptInvitationCommand(
+				rawToken = invitation.rawToken,
+				password = "collab-secret-password",
+				workspaceName = "Collab workspace",
+			),
+		)
+		val collaboratorSession = loginAs("collab@calendary.dev", "collab-secret-password")
+
+		mockMvc.perform(
+			mvcPatch("/api/workspaces/$ownerWorkspaceId/settings")
+				.session(collaboratorSession)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(
+					"""
+					{
+					  "name": "Hijacked workspace",
+					  "publicSlug": "hijacked-workspace",
+					  "defaultTimezone": "UTC"
+					}
+					""".trimIndent(),
+				),
+		)
+			.andExpect(status().isForbidden)
 	}
 
 	@Test

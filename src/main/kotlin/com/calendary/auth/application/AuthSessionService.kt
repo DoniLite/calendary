@@ -5,6 +5,7 @@ import com.calendary.common.api.UnauthorizedException
 import com.calendary.users.domain.UserAccount
 import com.calendary.users.domain.UserRole
 import com.calendary.users.infra.UserAccountRepository
+import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpSession
 import java.util.UUID
 import org.springframework.stereotype.Service
@@ -13,7 +14,9 @@ import org.springframework.stereotype.Service
 class AuthSessionService(
 	private val users: UserAccountRepository,
 ) {
-	fun signIn(session: HttpSession, user: UserAccount) {
+	fun signIn(request: HttpServletRequest, user: UserAccount) {
+		val session = request.getSession(true)
+		request.changeSessionId()
 		session.setAttribute(USER_ID_SESSION_KEY, user.id.toString())
 	}
 

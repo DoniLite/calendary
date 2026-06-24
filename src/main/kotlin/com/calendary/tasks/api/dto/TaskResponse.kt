@@ -6,6 +6,8 @@ import com.calendary.calendar.domain.CalendarVisibility
 import com.calendary.tasks.domain.Task
 import com.calendary.tasks.domain.TaskPriority
 import com.calendary.tasks.domain.TaskStatus
+import com.calendary.users.api.dto.MemberSummaryResponse
+import com.calendary.users.api.dto.toSummary
 import java.time.Instant
 import java.util.UUID
 
@@ -23,6 +25,7 @@ data class TaskResponse(
 	val epicId: UUID?,
 	val parentTaskId: UUID?,
 	val estimateMinutes: Int?,
+	val assignees: List<MemberSummaryResponse>,
 )
 
 fun Task.toResponse(): TaskResponse =
@@ -40,4 +43,5 @@ fun Task.toResponse(): TaskResponse =
 		epicId = epic?.id,
 		parentTaskId = parentTask?.id,
 		estimateMinutes = estimateMinutes,
+		assignees = assignees.mapNotNull { it.user }.map { it.toSummary() },
 	)

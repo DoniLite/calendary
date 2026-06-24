@@ -1,36 +1,37 @@
+import { zodResolver } from '@hookform/resolvers/zod'
 import { Copy, Mail, Shield, UserPlus, Users } from 'lucide-react'
-import { useState, type FormEvent } from 'react'
+import { useState } from 'react'
+import { useForm } from 'react-hook-form'
 import { Badge } from '../../components/ui/badge'
 import { Button } from '../../components/ui/button'
+import { FieldError } from '../../components/ui/form-field'
 import { Panel, PanelBody, PanelHeader, PanelTitle } from '../../components/ui/panel'
 import { useWorkspaceSession } from '../auth/workspace-session'
-import { apiPost, type CreatedInvitationResponse, type WorkspaceAccessLevel } from '../../lib/api'
+import { apiPost, type CreatedInvitationResponse } from '../../lib/api'
+import { inviteCollaboratorSchema, type InviteCollaboratorFormInput, type InviteCollaboratorFormValues } from '../../lib/schemas'
 
 export function CollaboratorsView() {
   const { activeWorkspace, user, workspaces } = useWorkspaceSession()
-  const [email, setEmail] = useState('')
-  const [accessLevel, setAccessLevel] = useState<Exclude<WorkspaceAccessLevel, 'OWNER'>>('READ')
-  const [expiresInDays, setExpiresInDays] = useState(7)
   const [createdInvitations, setCreatedInvitations] = useState<CreatedInvitationResponse[]>([])
-  const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors, isSubmitting },
+  } = useForm<InviteCollaboratorFormInput, unknown, InviteCollaboratorFormValues>({
+    resolver: zodResolver(inviteCollaboratorSchema),
+    defaultValues: { email: '', accessLevel: 'READ', expiresInDays: 7 },
+  })
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
+  async function onSubmit(values: InviteCollaboratorFormValues) {
     setError('')
-    setIsSubmitting(true)
     try {
-      const invitation = await apiPost<CreatedInvitationResponse>('/api/onboarding/invitations', {
-        email,
-        accessLevel,
-        expiresInDays,
-      })
+      const invitation = await apiPost<CreatedInvitationResponse>('/api/onboarding/invitations', values)
       setCreatedInvitations((current) => [invitation, ...current])
-      setEmail('')
+      reset({ email: '', accessLevel: values.accessLevel, expiresInDays: values.expiresInDays })
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Unable to create invitation.')
-    } finally {
-      setIsSubmitting(false)
     }
   }
 
@@ -53,27 +54,29 @@ export function CollaboratorsView() {
             </PanelTitle>
           </PanelHeader>
           <PanelBody>
-            <form className="grid gap-3 md:grid-cols-[1fr_160px_140px_auto]" onSubmit={handleSubmit}>
+            <form className="grid gap-3 md:grid-cols-[1fr_160px_140px_auto]" onSubmit={handleSubmit(onSubmit)}>
               <label className="grid gap-2">
                 <span className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
                   <Mail className="h-3.5 w-3.5" aria-hidden />
                   Email
                 </span>
-                <input className="h-10 rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="collaborator@example.com" required />
+                <input className="h-10 rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" type="email" placeholder="collaborator@example.com" {...register('email')} />
+                <FieldError message={errors.email?.message} />
               </label>
               <label className="grid gap-2">
                 <span className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
                   <Shield className="h-3.5 w-3.5" aria-hidden />
                   Access
                 </span>
-                <select className="h-10 rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" value={accessLevel} onChange={(event) => setAccessLevel(event.target.value as Exclude<WorkspaceAccessLevel, 'OWNER'>)}>
+                <select className="h-10 rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" {...register('accessLevel')}>
                   <option value="READ">Read</option>
                   <option value="WRITE">Write</option>
                 </select>
               </label>
               <label className="grid gap-2">
                 <span className="text-xs font-medium text-muted-foreground">Expires</span>
-                <input className="h-10 rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" type="number" min={1} max={30} value={expiresInDays} onChange={(event) => setExpiresInDays(Number(event.target.value))} />
+                <input className="h-10 rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" type="number" min={1} max={30} {...register('expiresInDays')} />
+                <FieldError message={errors.expiresInDays?.message} />
               </label>
               <Button className="mt-auto" disabled={isSubmitting || user?.role !== 'SUPER_ADMIN'}>
                 <UserPlus className="h-4 w-4" aria-hidden />

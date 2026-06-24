@@ -18,7 +18,9 @@ class AccountSecurityService(
 
 		val user = users.findById(command.userId)
 			.orElseThrow { IllegalArgumentException("User not found.") }
+		check(user.status != UserStatus.DISABLED) { "User account is disabled." }
 		check(passwordEncoder.matches(command.currentPassword, user.passwordHash)) { "Current password is invalid." }
+		require(command.currentPassword != command.newPassword) { "New password must be different from current password." }
 
 		user.passwordHash = passwordEncoder.encode(command.newPassword) ?: error("Password encoder returned null.")
 		user.status = UserStatus.ACTIVE

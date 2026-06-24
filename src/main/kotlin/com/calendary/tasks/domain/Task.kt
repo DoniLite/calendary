@@ -6,6 +6,7 @@ import com.calendary.common.persistence.AuditableEntity
 import com.calendary.projects.domain.Project
 import com.calendary.users.domain.UserAccount
 import com.calendary.workspaces.domain.Workspace
+import jakarta.persistence.CascadeType
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.EnumType
@@ -13,6 +14,7 @@ import jakarta.persistence.Enumerated
 import jakarta.persistence.FetchType
 import jakarta.persistence.JoinColumn
 import jakarta.persistence.ManyToOne
+import jakarta.persistence.OneToMany
 import jakarta.persistence.Table
 import java.time.Instant
 
@@ -66,4 +68,7 @@ open class Task(
 
 	@Column(name = "estimate_minutes")
 	open var estimateMinutes: Int? = null,
+
+	@OneToMany(mappedBy = "task", cascade = [CascadeType.ALL], orphanRemoval = true, fetch = FetchType.LAZY)
+	open var assignees: MutableList<TaskAssignee> = mutableListOf(),
 ) : AuditableEntity()

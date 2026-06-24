@@ -43,7 +43,7 @@ class NotificationService(
 		)
 		messaging.convertAndSend(
 			"/topic/users/${recipient.id}/notifications",
-			delivery.toPayload(unreadCount = deliveries.countByRecipientIdAndReadAtIsNull(recipient.id)),
+			delivery.toPayload(deliveries.countByRecipientIdAndReadAtIsNull(recipient.id)),
 		)
 		return delivery
 	}

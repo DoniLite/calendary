@@ -14,4 +14,5 @@ data class CreateEventRequest(
 	val timezone: String = "UTC",
 	val visibility: CalendarVisibility = CalendarVisibility.PRIVATE,
 	val colorPreset: CalendarColorPreset = CalendarColorPreset.BLUE,
+	val participantEmails: List<String> = emptyList(),
 )

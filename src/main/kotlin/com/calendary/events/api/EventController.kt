@@ -47,6 +47,7 @@ class EventController(
 				timezone = request.timezone,
 				visibility = request.visibility,
 				colorPreset = request.colorPreset,
+				participantEmails = request.participantEmails,
 			),
 		).toResponse()
 	}
@@ -82,6 +83,7 @@ class EventController(
 				visibility = request.visibility,
 				colorPreset = request.colorPreset,
 				status = request.status,
+				participantEmails = request.participantEmails,
 			),
 		).toResponse()
 	}

@@ -2,6 +2,7 @@ package com.calendary.publiccalendar.application
 
 import com.calendary.calendar.domain.CalendarVisibility
 import com.calendary.calendar.domain.CalendarColorPreset
+import com.calendary.calendar.domain.CalendarBlockSourceType
 import com.calendary.calendar.infra.CalendarBlockRepository
 import com.calendary.workspaces.infra.WorkspaceRepository
 import java.time.Duration
@@ -35,6 +36,7 @@ class PublicCalendarService(
 					endsAt = it.endsAt,
 					busy = true,
 					public = public,
+					sourceId = if (public) it.sourceId else null,
 					title = if (public) it.title else null,
 					sourceType = if (public) it.sourceType.name else null,
 					colorPreset = if (public) it.colorPreset else null,
@@ -46,6 +48,29 @@ class PublicCalendarService(
 			start = query.start,
 			end = query.end,
 			items = items,
+		)
+	}
+
+	@Transactional(readOnly = true)
+	fun getPublicCalendarItem(query: PublicCalendarItemQuery): PublicCalendarItem {
+		workspaces.findById(query.workspaceId)
+			.orElseThrow { IllegalArgumentException("Workspace not found.") }
+
+		val block = calendarBlocks
+			.findBySourceTypeAndSourceIdAndWorkspaceId(query.sourceType, query.sourceId, query.workspaceId)
+			.orElseThrow { IllegalArgumentException("Public calendar item not found.") }
+
+		require(block.visibility == CalendarVisibility.PUBLIC) { "Calendar item is not public." }
+
+		return PublicCalendarItem(
+			startsAt = block.startsAt,
+			endsAt = block.endsAt,
+			busy = block.busy,
+			public = true,
+			sourceId = block.sourceId,
+			title = block.title,
+			sourceType = block.sourceType.name,
+			colorPreset = block.colorPreset,
 		)
 	}
 
@@ -94,6 +119,12 @@ data class PublicCalendarQuery(
 	val end: Instant,
 )
 
+data class PublicCalendarItemQuery(
+	val workspaceId: UUID,
+	val sourceType: CalendarBlockSourceType,
+	val sourceId: UUID,
+)
+
 data class PublicCalendarView(
 	val workspaceId: UUID,
 	val start: Instant,
@@ -106,6 +137,7 @@ data class PublicCalendarItem(
 	val endsAt: Instant,
 	val busy: Boolean,
 	val public: Boolean,
+	val sourceId: UUID?,
 	val title: String?,
 	val sourceType: String?,
 	val colorPreset: CalendarColorPreset?,

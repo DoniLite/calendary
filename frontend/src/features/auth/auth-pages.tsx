@@ -1,32 +1,43 @@
+import { zodResolver } from '@hookform/resolvers/zod'
 import { AlertTriangle, KeyRound, Mail, Server, ShieldCheck, UserPlus } from 'lucide-react'
 import type { ComponentType, ReactNode } from 'react'
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useState } from 'react'
+import { useForm } from 'react-hook-form'
 import { Link, useNavigate } from '@tanstack/react-router'
 import { Button } from '../../components/ui/button'
+import { FieldError } from '../../components/ui/form-field'
 import { Panel, PanelBody, PanelHeader, PanelTitle } from '../../components/ui/panel'
-import { apiPatch, apiPost, type AuthenticatedUserResponse } from '../../lib/api'
+import { apiPatch, apiPost, fallbackPublicSlug, type AuthenticatedUserResponse } from '../../lib/api'
+import {
+  acceptInvitationSchema,
+  bootstrapSchema,
+  changePasswordSchema,
+  loginSchema,
+  type AcceptInvitationFormValues,
+  type BootstrapFormValues,
+  type ChangePasswordFormValues,
+  type LoginFormValues,
+} from '../../lib/schemas'
 import { useWorkspaceSession } from './workspace-session'
 
 export function LoginPage() {
   const navigate = useNavigate()
   const { isAuthenticated, isLoading, refreshSession, user } = useWorkspaceSession()
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<LoginFormValues>({ resolver: zodResolver(loginSchema), defaultValues: { email: '', password: '' } })
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
+  async function onSubmit(values: LoginFormValues) {
     setError('')
-    setIsSubmitting(true)
     try {
-      const user = await apiPost<AuthenticatedUserResponse>('/api/auth/login', { email, password })
+      const user = await apiPost<AuthenticatedUserResponse>('/api/auth/login', values)
       await refreshSession()
       await navigate({ to: nextRouteFor(user) })
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Unable to sign in.')
-    } finally {
-      setIsSubmitting(false)
     }
   }
 
@@ -38,16 +49,18 @@ export function LoginPage() {
 
   return (
     <AuthFrame title="Sign in" subtitle="Access your Calendary workspace.">
-      <form className="grid gap-4" onSubmit={handleSubmit}>
+      <form className="grid gap-4" onSubmit={handleSubmit(onSubmit)}>
         <Field icon={Mail} label="Email">
-          <input className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="owner@calendary.dev" required />
+          <input className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" type="email" placeholder="owner@calendary.dev" {...register('email')} />
+          <FieldError message={errors.email?.message} />
         </Field>
         <Field icon={KeyRound} label="Password">
-          <input className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Password" required />
+          <input className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" type="password" placeholder="Password" {...register('password')} />
+          <FieldError message={errors.password?.message} />
         </Field>
         {error && <p className="rounded-md border border-busy/30 bg-busy/10 px-3 py-2 text-sm">{error}</p>}
         <Button disabled={isSubmitting}>{isSubmitting ? 'Signing in' : 'Sign in'}</Button>
-        <Link to="/p/doni/calendar" className="text-center text-sm text-muted-foreground hover:text-foreground">
+        <Link to="/p/$publicSlug/calendar" params={{ publicSlug: fallbackPublicSlug }} className="text-center text-sm text-muted-foreground hover:text-foreground">
           Back to public calendar
         </Link>
       </form>
@@ -59,30 +72,25 @@ export function BootstrapPage() {
   const navigate = useNavigate()
   const { refreshSession } = useWorkspaceSession()
   const [setupArmed, setSetupArmed] = useState(false)
-  const [confirmation, setConfirmation] = useState('')
-  const [email, setEmail] = useState('')
-  const [workspaceName, setWorkspaceName] = useState('Owner workspace')
-  const [password, setPassword] = useState('')
-  const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<BootstrapFormValues>({
+    resolver: zodResolver(bootstrapSchema),
+    defaultValues: { email: '', workspaceName: 'Owner workspace', password: '', confirmation: '' },
+  })
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    if (confirmation !== 'CREATE OWNER') {
-      setError('Type CREATE OWNER to confirm server bootstrap.')
-      return
-    }
+  async function onSubmit(values: BootstrapFormValues) {
     setError('')
-    setIsSubmitting(true)
     try {
-      await apiPost('/api/onboarding/super-admin', { email, workspaceName, password })
-      const user = await apiPost<AuthenticatedUserResponse>('/api/auth/login', { email, password })
+      await apiPost('/api/onboarding/super-admin', { email: values.email, workspaceName: values.workspaceName, password: values.password })
+      const user = await apiPost<AuthenticatedUserResponse>('/api/auth/login', { email: values.email, password: values.password })
       await refreshSession()
       await navigate({ to: nextRouteFor(user) })
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Unable to bootstrap server.')
-    } finally {
-      setIsSubmitting(false)
     }
   }
 
@@ -104,7 +112,7 @@ export function BootstrapPage() {
           </Button>
           <div className="grid gap-2 text-center text-sm">
             <Link to="/login" className="text-muted-foreground hover:text-foreground">I already have an account</Link>
-            <Link to="/p/doni/calendar" className="text-muted-foreground hover:text-foreground">Back to public calendar</Link>
+            <Link to="/p/$publicSlug/calendar" params={{ publicSlug: fallbackPublicSlug }} className="text-muted-foreground hover:text-foreground">Back to public calendar</Link>
           </div>
         </div>
       </AuthFrame>
@@ -113,18 +121,22 @@ export function BootstrapPage() {
 
   return (
     <AuthFrame title="Bootstrap server" subtitle="Create the first super admin account.">
-      <form className="grid gap-4" onSubmit={handleSubmit}>
+      <form className="grid gap-4" onSubmit={handleSubmit(onSubmit)}>
         <Field icon={Mail} label="Email">
-          <input className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="owner@calendary.dev" required />
+          <input className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" type="email" placeholder="owner@calendary.dev" {...register('email')} />
+          <FieldError message={errors.email?.message} />
         </Field>
         <Field icon={Server} label="Workspace name">
-          <input className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" value={workspaceName} onChange={(event) => setWorkspaceName(event.target.value)} placeholder="Owner workspace" required />
+          <input className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" placeholder="Owner workspace" {...register('workspaceName')} />
+          <FieldError message={errors.workspaceName?.message} />
         </Field>
         <Field icon={KeyRound} label="Password">
-          <input className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" type="password" value={password} onChange={(event) => setPassword(event.target.value)} minLength={12} required />
+          <input className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" type="password" {...register('password')} />
+          <FieldError message={errors.password?.message} />
         </Field>
         <Field icon={AlertTriangle} label="Confirmation">
-          <input className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" value={confirmation} onChange={(event) => setConfirmation(event.target.value)} placeholder="Type CREATE OWNER" required />
+          <input className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" placeholder="Type CREATE OWNER" {...register('confirmation')} />
+          <FieldError message={errors.confirmation?.message} />
         </Field>
         {error && <p className="rounded-md border border-busy/30 bg-busy/10 px-3 py-2 text-sm">{error}</p>}
         <Button disabled={isSubmitting}>{isSubmitting ? 'Creating' : 'Create super admin'}</Button>
@@ -139,42 +151,43 @@ export function BootstrapPage() {
 export function AcceptInvitationPage() {
   const navigate = useNavigate()
   const { refreshSession } = useWorkspaceSession()
-  const [token, setToken] = useState(() => {
-    if (typeof window === 'undefined') return ''
-    return new URLSearchParams(window.location.search).get('token') ?? ''
-  })
-  const [workspaceName, setWorkspaceName] = useState('My workspace')
-  const [password, setPassword] = useState('')
-  const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
+  const initialToken = typeof window === 'undefined' ? '' : new URLSearchParams(window.location.search).get('token') ?? ''
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<AcceptInvitationFormValues>({
+    resolver: zodResolver(acceptInvitationSchema),
+    defaultValues: { token: initialToken, workspaceName: 'My workspace', password: '' },
+  })
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
+  async function onSubmit(values: AcceptInvitationFormValues) {
     setError('')
-    setIsSubmitting(true)
     try {
-      const user = await apiPost<{ email: string }>('/api/onboarding/invitations/accept', { token, workspaceName, password })
-      const authenticatedUser = await apiPost<AuthenticatedUserResponse>('/api/auth/login', { email: user.email, password })
+      const user = await apiPost<{ email: string }>('/api/onboarding/invitations/accept', values)
+      const authenticatedUser = await apiPost<AuthenticatedUserResponse>('/api/auth/login', { email: user.email, password: values.password })
       await refreshSession()
       await navigate({ to: nextRouteFor(authenticatedUser) })
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Unable to accept invitation.')
-    } finally {
-      setIsSubmitting(false)
     }
   }
 
   return (
     <AuthFrame title="Accept invitation" subtitle="Create your collaborator account and private workspace.">
-      <form className="grid gap-4" onSubmit={handleSubmit}>
+      <form className="grid gap-4" onSubmit={handleSubmit(onSubmit)}>
         <Field icon={UserPlus} label="Invitation token">
-          <input className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" value={token} onChange={(event) => setToken(event.target.value)} placeholder="Paste token" required />
+          <input className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" placeholder="Paste token" {...register('token')} />
+          <FieldError message={errors.token?.message} />
         </Field>
         <Field icon={Server} label="Workspace name">
-          <input className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" value={workspaceName} onChange={(event) => setWorkspaceName(event.target.value)} placeholder="My workspace" required />
+          <input className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" placeholder="My workspace" {...register('workspaceName')} />
+          <FieldError message={errors.workspaceName?.message} />
         </Field>
         <Field icon={KeyRound} label="New password">
-          <input className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" type="password" value={password} onChange={(event) => setPassword(event.target.value)} minLength={12} required />
+          <input className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" type="password" {...register('password')} />
+          <FieldError message={errors.password?.message} />
         </Field>
         {error && <p className="rounded-md border border-busy/30 bg-busy/10 px-3 py-2 text-sm">{error}</p>}
         <Button disabled={isSubmitting}>{isSubmitting ? 'Accepting' : 'Accept invitation'}</Button>
@@ -186,23 +199,24 @@ export function AcceptInvitationPage() {
 export function ChangePasswordPage() {
   const navigate = useNavigate()
   const { user, refreshSession, isLoading } = useWorkspaceSession()
-  const [currentPassword, setCurrentPassword] = useState('')
-  const [newPassword, setNewPassword] = useState('')
-  const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<ChangePasswordFormValues>({
+    resolver: zodResolver(changePasswordSchema),
+    defaultValues: { currentPassword: '', newPassword: '' },
+  })
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
+  async function onSubmit(values: ChangePasswordFormValues) {
     setError('')
-    setIsSubmitting(true)
     try {
-      const updatedUser = await apiPatch<AuthenticatedUserResponse>('/api/auth/password', { currentPassword, newPassword })
+      const updatedUser = await apiPatch<AuthenticatedUserResponse>('/api/auth/password', values)
       await refreshSession()
       await navigate({ to: nextRouteFor(updatedUser) })
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Unable to change password.')
-    } finally {
-      setIsSubmitting(false)
     }
   }
 
@@ -214,12 +228,14 @@ export function ChangePasswordPage() {
 
   return (
     <AuthFrame title="Change password" subtitle="Set a permanent password before opening your workspace.">
-      <form className="grid gap-4" onSubmit={handleSubmit}>
+      <form className="grid gap-4" onSubmit={handleSubmit(onSubmit)}>
         <Field icon={ShieldCheck} label="Current password">
-          <input className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" type="password" value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} required />
+          <input className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" type="password" {...register('currentPassword')} />
+          <FieldError message={errors.currentPassword?.message} />
         </Field>
         <Field icon={KeyRound} label="New password">
-          <input className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" type="password" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} minLength={12} required />
+          <input className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" type="password" {...register('newPassword')} />
+          <FieldError message={errors.newPassword?.message} />
         </Field>
         {error && <p className="rounded-md border border-busy/30 bg-busy/10 px-3 py-2 text-sm">{error}</p>}
         <Button disabled={isSubmitting || isLoading}>{isSubmitting ? 'Saving' : 'Save password'}</Button>

@@ -1,44 +1,42 @@
+import { zodResolver } from '@hookform/resolvers/zod'
 import { CalendarPlus, CheckCircle2, ChevronLeft, ChevronRight, Clock, Globe2, Lock, Mail, MessageSquare, User } from 'lucide-react'
 import { Link, useRouterState } from '@tanstack/react-router'
-import { useMemo, useState, type ComponentType, type CSSProperties, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ComponentType, type CSSProperties, type ReactNode } from 'react'
+import { useForm } from 'react-hook-form'
 import { Badge } from '../../components/ui/badge'
 import { Button } from '../../components/ui/button'
+import { FieldError } from '../../components/ui/form-field'
 import { Panel, PanelBody, PanelHeader, PanelTitle } from '../../components/ui/panel'
-import { calendarItems } from '../../lib/demo-data'
-import { convertWallClockRange, dayIndexInTimezone, formatTimeInTimezone } from '../../lib/timezone'
-import { fallbackWorkspaceId, usePublicAvailabilityQuery, usePublicBookingMutation, usePublicCalendarQuery, type PublicCalendarItemResponse } from '../../lib/api'
+import type { CalendarItem } from '../../lib/demo-data'
+import { bookingRequestSchema, type BookingRequestFormValues } from '../../lib/schemas'
+import { dayIndexInTimezone, formatTimeInTimezone } from '../../lib/timezone'
+import { fallbackPublicSlug, fallbackWorkspaceId, usePublicAvailabilityQuery, usePublicBookingMutation, usePublicCalendarItemQuery, usePublicCalendarQuery, usePublicWorkspaceProfileQuery, type CalendarBlockSourceType, type PublicCalendarItemResponse } from '../../lib/api'
 
 const hours = Array.from({ length: 24 }, (_, index) => index)
 const hourHeight = 56
-const publicSlots = ['09:30', '11:30', '16:00', '16:30', 'Friday 10:00', 'Friday 14:30']
 const timezones = ['Europe/Paris', 'UTC', 'Africa/Abidjan', 'America/New_York', 'Asia/Tokyo']
-const publicItems = calendarItems.filter((item) => item.visibility === 'PUBLIC')
-const busyPrivate = [
-  { dayIndex: 1, startsAt: '09:00', endsAt: '10:00' },
-  { dayIndex: 3, startsAt: '14:00', endsAt: '17:00' },
-]
-const fallbackRequestSlots = [
-  { id: 'slot-1', label: '09:30', startsAt: '2026-07-01T09:30:00Z', endsAt: '2026-07-01T10:00:00Z', available: true },
-  { id: 'slot-2', label: '11:30', startsAt: '2026-07-01T11:30:00Z', endsAt: '2026-07-01T12:00:00Z', available: true },
-  { id: 'slot-3', label: '16:00', startsAt: '2026-07-01T16:00:00Z', endsAt: '2026-07-01T16:30:00Z', available: true },
-  { id: 'slot-4', label: 'Friday 10:00', startsAt: '2026-07-03T10:00:00Z', endsAt: '2026-07-03T10:30:00Z', available: true },
-]
 
 export function PublicCalendarPage() {
+  const publicWorkspace = usePublicWorkspaceFromRoute()
   const [weekOffset, setWeekOffset] = useState(0)
-  const [timezone, setTimezone] = useState('Europe/Paris')
+  const [timezone, setTimezone] = useState(publicWorkspace.defaultTimezone)
   const [selected, setSelected] = useState<PublicSelection | null>(null)
   const days = useMemo(() => weekDays(addDays(startOfWeek(new Date()), weekOffset * 7)), [weekOffset])
-  const publicCalendarQuery = usePublicCalendarQuery(fallbackWorkspaceId || undefined, days[0], addDays(days[0], 7))
-  const apiItems = publicCalendarQuery.data?.items.map((item, index) => publicApiItemToCalendarItem(item, index, days, timezone))
-  const visiblePublicItems = useMemo(() => apiItems ?? publicItems.map((item) => convertWallClockRange(item, days, timezone)), [apiItems, days, timezone])
-  const visibleBusyPrivate = useMemo(() => apiItems ? [] : busyPrivate.map((item) => convertWallClockRange(item, days, timezone)), [apiItems, days, timezone])
+  const publicCalendarQuery = usePublicCalendarQuery(publicWorkspace.workspaceId, days[0], addDays(days[0], 7))
+  const visiblePublicItems = useMemo(
+    () => publicCalendarQuery.data?.items.map((item, index) => publicApiItemToCalendarItem(item, index, days, timezone, publicWorkspace.displayName)) ?? [],
+    [publicCalendarQuery.data, days, timezone, publicWorkspace.displayName],
+  )
+  useEffect(() => {
+    setTimezone(publicWorkspace.defaultTimezone)
+    setSelected(null)
+  }, [publicWorkspace.defaultTimezone])
 
   return (
     <div className="space-y-5">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <h1 className="text-3xl font-semibold">Doni public calendar</h1>
+          <h1 className="text-3xl font-semibold">{publicWorkspace.displayName} public calendar</h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
             Public items show their title. Private busy time stays masked so visitors can understand availability without seeing private context.
           </p>
@@ -71,7 +69,7 @@ export function PublicCalendarPage() {
         <Panel className="overflow-hidden">
           <div className="border-b bg-muted px-4 py-3 text-sm text-muted-foreground">
             Display timezone: <span className="font-medium text-foreground">{timezone}</span>
-            {publicCalendarQuery.isFetching && <span> · Syncing public API</span>}
+            {(publicWorkspace.isProfileLoading || publicCalendarQuery.isFetching) && <span> · Syncing public API</span>}
           </div>
           <div className="max-h-[720px] overflow-auto">
             <div className="grid min-w-[1240px]" style={{ gridTemplateColumns: `76px repeat(${days.length}, minmax(160px, 1fr))` }}>
@@ -89,7 +87,7 @@ export function PublicCalendarPage() {
                 ))}
               </div>
               {days.map((day, dayIndex) => (
-                <PublicDayColumn key={day.toISOString()} dayIndex={dayIndex} publicItems={visiblePublicItems} busyItems={visibleBusyPrivate} onSelect={setSelected} />
+                <PublicDayColumn key={day.toISOString()} dayIndex={dayIndex} publicItems={visiblePublicItems} onSelect={setSelected} />
               ))}
             </div>
           </div>
@@ -112,8 +110,8 @@ export function PublicCalendarPage() {
                 </div>
                 {selected.entryId ? (
                   <Link
-                    to="/p/doni/calendar/$entryId"
-                    params={{ entryId: selected.entryId }}
+                    to="/p/$publicSlug/calendar/$entryId"
+                    params={{ publicSlug: publicWorkspace.publicSlug, entryId: selected.entryId }}
                     className="inline-flex h-9 w-full items-center justify-center gap-2 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   >
                     <CalendarPlus className="h-4 w-4" aria-hidden />
@@ -142,11 +140,15 @@ export function PublicCalendarPage() {
             <PanelTitle>Visible public blocks</PanelTitle>
           </PanelHeader>
           <PanelBody className="space-y-3">
-            {visiblePublicItems.map((item) => (
+            {publicCalendarQuery.isPending && <div className="rounded-md border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">Loading public calendar...</div>}
+            {!publicCalendarQuery.isPending && !visiblePublicItems.filter((item) => item.visibility === 'PUBLIC').length && (
+              <div className="rounded-md border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">No public blocks this week.</div>
+            )}
+            {visiblePublicItems.filter((item) => item.visibility === 'PUBLIC').map((item) => (
               <Link
                 key={item.id}
-                to="/p/doni/calendar/$entryId"
-                params={{ entryId: item.id }}
+                to="/p/$publicSlug/calendar/$entryId"
+                params={{ publicSlug: publicWorkspace.publicSlug, entryId: item.id }}
                 className="block rounded-md border p-3 transition-colors hover:border-primary/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 style={{ backgroundColor: item.color.background, borderColor: item.color.border }}
               >
@@ -167,7 +169,6 @@ export function PublicCalendarPage() {
           </PanelHeader>
           <PanelBody className="space-y-3 text-sm text-muted-foreground">
             <p>Use previous and next week to browse past or future public availability.</p>
-            <p>Backend integration will request `/public/workspaces/:id/calendar` for the selected range and display timezone.</p>
           </PanelBody>
         </Panel>
       </section>
@@ -176,14 +177,34 @@ export function PublicCalendarPage() {
 }
 
 export function PublicCalendarEntryPage() {
+  const publicWorkspace = usePublicWorkspaceFromRoute()
   const pathname = useRouterState({ select: (state) => state.location.pathname })
   const entryId = pathname.split('/').at(-1)
-  const item = publicItems.find((candidate) => candidate.id === entryId)
+  const [sourceType, sourceId] = parsePublicEntryId(entryId)
+  const entryQuery = usePublicCalendarItemQuery(publicWorkspace.workspaceId, sourceType, sourceId)
+  const item = entryQuery.data ? publicApiItemToDetailItem(entryQuery.data, sourceId ?? entryId ?? 'public-entry', publicWorkspace.defaultTimezone, publicWorkspace.displayName) : undefined
+
+  if (publicWorkspace.workspaceId && sourceType && sourceId && entryQuery.isPending) {
+    return (
+      <div className="mx-auto max-w-3xl space-y-5">
+        <Link to="/p/$publicSlug/calendar" params={{ publicSlug: publicWorkspace.publicSlug }} className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground">
+          <ChevronLeft className="h-4 w-4" aria-hidden />
+          Back to calendar
+        </Link>
+        <Panel>
+          <PanelHeader>
+            <PanelTitle>Loading public entry</PanelTitle>
+          </PanelHeader>
+          <PanelBody className="text-sm text-muted-foreground">Loading public calendar detail...</PanelBody>
+        </Panel>
+      </div>
+    )
+  }
 
   if (!item) {
     return (
       <div className="mx-auto max-w-3xl space-y-5">
-        <Link to="/p/doni/calendar" className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground">
+        <Link to="/p/$publicSlug/calendar" params={{ publicSlug: publicWorkspace.publicSlug }} className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground">
           <ChevronLeft className="h-4 w-4" aria-hidden />
           Back to calendar
         </Link>
@@ -202,7 +223,7 @@ export function PublicCalendarEntryPage() {
   return (
     <div className="mx-auto max-w-4xl space-y-5">
       <div>
-        <Link to="/p/doni/calendar" className="mb-3 inline-flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground">
+        <Link to="/p/$publicSlug/calendar" params={{ publicSlug: publicWorkspace.publicSlug }} className="mb-3 inline-flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground">
           <ChevronLeft className="h-4 w-4" aria-hidden />
           Back to calendar
         </Link>
@@ -245,9 +266,10 @@ export function PublicCalendarEntryPage() {
               <PanelTitle>Request</PanelTitle>
             </PanelHeader>
             <PanelBody className="space-y-3">
-              <p className="text-sm text-muted-foreground">Visitors can request a meeting around this public block. Doni still validates the booking before confirmation.</p>
+              <p className="text-sm text-muted-foreground">Visitors can request a meeting around this public block. {publicWorkspace.displayName} still validates the booking before confirmation.</p>
               <Link
-                to="/p/doni/request"
+                to="/p/$publicSlug/request"
+                params={{ publicSlug: publicWorkspace.publicSlug }}
                 className="inline-flex h-9 w-full items-center justify-center gap-2 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <CalendarPlus className="h-4 w-4" aria-hidden />
@@ -272,18 +294,25 @@ export function PublicCalendarEntryPage() {
 }
 
 export function PublicAvailabilityPage() {
-  const [timezone, setTimezone] = useState('Europe/Paris')
+  const publicWorkspace = usePublicWorkspaceFromRoute()
+  const [timezone, setTimezone] = useState(publicWorkspace.defaultTimezone)
   const start = useMemo(() => startOfWeek(new Date()), [])
-  const availabilityQuery = usePublicAvailabilityQuery(fallbackWorkspaceId || undefined, start, addDays(start, 7))
+  const availabilityQuery = usePublicAvailabilityQuery(publicWorkspace.workspaceId, start, addDays(start, 7))
   const slots = availabilityQuery.data?.slots.map((slot, index) => ({
     id: `slot-${index}`,
     label: formatSlotLabel(slot.startsAt, timezone),
     startsAt: slot.startsAt,
     endsAt: slot.endsAt,
     available: slot.available,
-  })) ?? fallbackRequestSlots.map((slot) => ({ ...slot, label: formatSlotLabel(slot.startsAt, timezone) }))
-  const firstAvailable = slots.find((slot) => slot.available)?.id ?? slots[0]?.id
-  const [selectedSlot, setSelectedSlot] = useState(firstAvailable)
+  })) ?? []
+  const [selectedSlot, setSelectedSlot] = useState<string>()
+  useEffect(() => {
+    setTimezone(publicWorkspace.defaultTimezone)
+  }, [publicWorkspace.defaultTimezone])
+  useEffect(() => {
+    if (selectedSlot || !slots.length) return
+    setSelectedSlot(slots.find((slot) => slot.available)?.id ?? slots[0]?.id)
+  }, [slots, selectedSlot])
   return (
     <div className="space-y-5">
       <div>
@@ -303,6 +332,10 @@ export function PublicAvailabilityPage() {
           <PanelTitle>Available slots</PanelTitle>
         </PanelHeader>
         <PanelBody className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {availabilityQuery.isPending && <div className="rounded-md border bg-muted/40 px-4 py-3 text-sm text-muted-foreground sm:col-span-2 xl:col-span-3">Loading availability...</div>}
+          {!availabilityQuery.isPending && !slots.length && (
+            <div className="rounded-md border bg-muted/40 px-4 py-3 text-sm text-muted-foreground sm:col-span-2 xl:col-span-3">No slots available this week.</div>
+          )}
           {slots.map((slot) => (
             <button
               key={slot.id}
@@ -340,28 +373,59 @@ export function PublicAvailabilityPage() {
 }
 
 export function PublicRequestPage() {
+  const publicWorkspace = usePublicWorkspaceFromRoute()
   const [sent, setSent] = useState(false)
-  const [timezone, setTimezone] = useState('Europe/Paris')
-  const [slotId, setSlotId] = useState(fallbackRequestSlots[2].id)
-  const [name, setName] = useState('')
-  const [email, setEmail] = useState('')
-  const [message, setMessage] = useState('')
+  const [slotId, setSlotId] = useState<string>()
   const start = useMemo(() => startOfWeek(new Date()), [])
-  const availabilityQuery = usePublicAvailabilityQuery(fallbackWorkspaceId || undefined, start, addDays(start, 7))
+  const availabilityQuery = usePublicAvailabilityQuery(publicWorkspace.workspaceId, start, addDays(start, 7))
+  const bookingMutation = usePublicBookingMutation(publicWorkspace.workspaceId)
+  const {
+    register,
+    handleSubmit,
+    watch,
+    setValue,
+    formState: { errors },
+  } = useForm<BookingRequestFormValues>({
+    resolver: zodResolver(bookingRequestSchema),
+    defaultValues: { name: '', email: '', timezone: publicWorkspace.defaultTimezone, message: '' },
+  })
+  const timezone = watch('timezone')
   const slots = availabilityQuery.data?.slots.filter((slot) => slot.available).map((slot, index) => ({
     id: `slot-${index}`,
     label: formatSlotLabel(slot.startsAt, timezone),
     startsAt: slot.startsAt,
     endsAt: slot.endsAt,
     available: slot.available,
-  })) ?? fallbackRequestSlots.map((slot) => ({ ...slot, label: formatSlotLabel(slot.startsAt, timezone) }))
+  })) ?? []
   const selectedSlot = slots.find((slot) => slot.id === slotId) ?? slots[0]
-  const bookingMutation = usePublicBookingMutation(fallbackWorkspaceId || undefined)
+  useEffect(() => {
+    setValue('timezone', publicWorkspace.defaultTimezone)
+  }, [publicWorkspace.defaultTimezone, setValue])
+  useEffect(() => {
+    if (!slotId && slots.length) setSlotId(slots[0].id)
+  }, [slotId, slots])
+
+  function onSubmit(values: BookingRequestFormValues) {
+    if (!selectedSlot) return
+    if (!publicWorkspace.workspaceId) {
+      setSent(true)
+      return
+    }
+    bookingMutation.mutate({
+      requesterName: values.name,
+      requesterEmail: values.email,
+      message: values.message,
+      startsAt: selectedSlot.startsAt,
+      endsAt: selectedSlot.endsAt,
+      timezone: values.timezone,
+    }, { onSuccess: () => setSent(true) })
+  }
+
   return (
     <div className="mx-auto max-w-2xl space-y-5">
       <div>
         <h1 className="text-3xl font-semibold">Request a booking</h1>
-        <p className="mt-2 text-sm text-muted-foreground">Doni reviews every request before a Google Meet is created.</p>
+        <p className="mt-2 text-sm text-muted-foreground">{publicWorkspace.displayName} reviews every request before a Google Meet is created.</p>
       </div>
       <Panel>
         <PanelHeader>
@@ -372,48 +436,39 @@ export function PublicRequestPage() {
             <div className="rounded-md border border-available/30 bg-available/10 p-4">
               <div className="font-semibold">Request sent</div>
               <p className="mt-2 text-sm text-muted-foreground">
-                If Doni accepts, you will receive an email with the meeting time and Google Meet link.
+                If {publicWorkspace.displayName} accepts, you will receive an email with the meeting time and Google Meet link.
               </p>
             </div>
           ) : (
-            <form className="grid gap-4" onSubmit={(event) => {
-              event.preventDefault()
-              if (!selectedSlot) return
-              if (!fallbackWorkspaceId) {
-                setSent(true)
-                return
-              }
-              bookingMutation.mutate({
-                requesterName: name,
-                requesterEmail: email,
-                message,
-                startsAt: selectedSlot.startsAt,
-                endsAt: selectedSlot.endsAt,
-                timezone,
-              }, { onSuccess: () => setSent(true) })
-            }}>
+            <form className="grid gap-4" onSubmit={handleSubmit(onSubmit)}>
               <Field icon={User} label="Name">
-                <input className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" required value={name} onChange={(event) => setName(event.target.value)} placeholder="Ada Lovelace" />
+                <input className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" placeholder="Ada Lovelace" {...register('name')} />
+                <FieldError message={errors.name?.message} />
               </Field>
               <Field icon={Mail} label="Email">
-                <input className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" required type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="ada@example.com" />
+                <input className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" type="email" placeholder="ada@example.com" {...register('email')} />
+                <FieldError message={errors.email?.message} />
               </Field>
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field icon={Globe2} label="Timezone">
-                  <select className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" value={timezone} onChange={(event) => setTimezone(event.target.value)}>
+                  <select className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" {...register('timezone')}>
                     {timezones.map((value) => <option key={value}>{value}</option>)}
                   </select>
                 </Field>
                 <Field icon={CalendarPlus} label="Selected slot">
-                  <select className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" value={selectedSlot?.id ?? ''} onChange={(event) => setSlotId(event.target.value)}>
+                  <select className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" value={selectedSlot?.id ?? ''} onChange={(event) => setSlotId(event.target.value)} disabled={!slots.length}>
+                    {!slots.length && <option value="">No slot available</option>}
                     {slots.map((slot) => (
                       <option key={slot.id} value={slot.id}>{slot.label}</option>
                     ))}
                   </select>
                 </Field>
               </div>
+              {!availabilityQuery.isPending && !slots.length && (
+                <div className="rounded-md border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">No available slots this week. Try a later week.</div>
+              )}
               <Field icon={MessageSquare} label="Message">
-                <textarea className="min-h-24 w-full rounded-md border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring" value={message} onChange={(event) => setMessage(event.target.value)} placeholder="What should Doni know?" />
+                <textarea className="min-h-24 w-full rounded-md border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring" placeholder={`What should ${publicWorkspace.displayName} know?`} {...register('message')} />
               </Field>
               {bookingMutation.isError && <div className="rounded-md border border-busy/30 bg-busy/10 px-3 py-2 text-sm">Unable to send this booking request.</div>}
               <Button disabled={bookingMutation.isPending || !selectedSlot}>
@@ -428,15 +483,15 @@ export function PublicRequestPage() {
   )
 }
 
+type PublicDayItem = ReturnType<typeof publicApiItemToCalendarItem>
+
 function PublicDayColumn({
   dayIndex,
   publicItems,
-  busyItems,
   onSelect,
 }: {
   dayIndex: number
-  publicItems: typeof calendarItems
-  busyItems: typeof busyPrivate
+  publicItems: PublicDayItem[]
   onSelect: (selection: PublicSelection) => void
 }) {
   return (
@@ -444,39 +499,26 @@ function PublicDayColumn({
       {hours.map((hour) => (
         <div key={hour} className="border-b" style={{ height: hourHeight }} />
       ))}
-      {busyItems.filter((item) => item.dayIndex === dayIndex).map((item) => (
-        <PublicBlock
-          key={`${item.dayIndex}-${item.startsAt}`}
-          title="Busy"
-          startsAt={item.startsAt}
-          endsAt={item.endsAt}
-          color="private"
-          onSelect={() => onSelect({
-            title: 'Busy',
-            startsAt: item.startsAt,
-            endsAt: item.endsAt,
-            description: 'This time is occupied. The private details are hidden.',
-            colorStyle: undefined,
-          })}
-        />
-      ))}
-      {publicItems.filter((item) => item.dayIndex === dayIndex).map((item) => (
-        <PublicBlock
-          key={item.id}
-          title={item.busy ? item.title : 'Available'}
-          startsAt={item.startsAt}
-          endsAt={item.endsAt}
-          color={item.busy ? 'public' : 'free'}
-          onSelect={() => onSelect({
-            title: item.busy ? item.title : 'Available',
-            startsAt: item.startsAt,
-            endsAt: item.endsAt,
-            description: item.description,
-            entryId: item.id,
-            colorStyle: { backgroundColor: item.color.background, borderColor: item.color.border, color: item.color.foreground },
-          })}
-        />
-      ))}
+      {publicItems.filter((item) => item.dayIndex === dayIndex).map((item) => {
+        const isPublic = item.visibility === 'PUBLIC'
+        return (
+          <PublicBlock
+            key={item.id}
+            title={item.busy ? item.title : 'Available'}
+            startsAt={item.startsAt}
+            endsAt={item.endsAt}
+            color={!item.busy ? 'free' : isPublic ? 'public' : 'private'}
+            onSelect={() => onSelect({
+              title: item.busy ? item.title : 'Available',
+              startsAt: item.startsAt,
+              endsAt: item.endsAt,
+              description: item.description,
+              entryId: isPublic ? item.id : undefined,
+              colorStyle: isPublic ? { backgroundColor: item.color.background, borderColor: item.color.border, color: item.color.foreground } : undefined,
+            })}
+          />
+        )
+      })}
     </div>
   )
 }
@@ -505,6 +547,25 @@ function PublicBlock({ title, startsAt, endsAt, color, onSelect }: { title: stri
       {children}
     </button>
   )
+}
+
+function usePublicWorkspaceFromRoute() {
+  const pathname = useRouterState({ select: (state) => state.location.pathname })
+  const publicSlug = publicSlugFromPath(pathname)
+  const profileQuery = usePublicWorkspaceProfileQuery(publicSlug)
+  const displayName = profileQuery.data?.name ?? (publicSlug === 'doni' ? 'Doni' : publicSlug)
+  return {
+    publicSlug,
+    displayName,
+    workspaceId: profileQuery.data?.id ?? (fallbackWorkspaceId || undefined),
+    defaultTimezone: profileQuery.data?.defaultTimezone ?? 'Europe/Paris',
+    isProfileLoading: profileQuery.isPending,
+  }
+}
+
+function publicSlugFromPath(pathname: string) {
+  const [, section, slug] = pathname.split('/')
+  return section === 'p' && slug ? slug : fallbackPublicSlug
 }
 
 type PublicSelection = {
@@ -581,7 +642,7 @@ function formatSlotLabel(value: string, timezone: string) {
   return new Intl.DateTimeFormat(undefined, { weekday: 'short', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: timezone }).format(new Date(value))
 }
 
-function publicApiItemToCalendarItem(item: PublicCalendarItemResponse, index: number, days: Date[], timezone: string) {
+function publicApiItemToCalendarItem(item: PublicCalendarItemResponse, index: number, days: Date[], timezone: string, workspaceName: string) {
   const startsAt = new Date(item.startsAt)
   const color = item.color ?? {
     preset: item.public ? 'BLUE' : 'SLATE',
@@ -590,7 +651,7 @@ function publicApiItemToCalendarItem(item: PublicCalendarItemResponse, index: nu
     border: item.public ? '#93c5fd' : '#94a3b8',
   } as const
   return {
-    id: `public-${index}`,
+    id: item.public && item.sourceId && item.sourceType ? `${item.sourceType}:${item.sourceId}` : `public-${index}`,
     title: item.public ? item.title ?? 'Public block' : item.busy ? 'Busy' : 'Available',
     kind: item.sourceType === 'TASK' || item.sourceType === 'PROJECT' ? item.sourceType : 'EVENT',
     dayIndex: dayIndexInTimezone(startsAt, days, timezone),
@@ -604,12 +665,55 @@ function publicApiItemToCalendarItem(item: PublicCalendarItemResponse, index: nu
       foreground: color.foreground,
       border: color.border,
     },
-    owner: 'Doni',
+    owner: workspaceName,
     status: item.busy ? 'BUSY' : 'AVAILABLE',
-    workspace: 'Public calendar',
+    workspace: workspaceName,
+    project: undefined,
+    epic: undefined,
     participants: [],
     description: item.public ? 'Public calendar entry.' : 'This time is occupied. The private details are hidden.',
     attachments: 0,
     publicLabel: item.public ? 'Public block' : undefined,
-  } satisfies typeof calendarItems[number]
+  } satisfies CalendarItem
+}
+
+function publicApiItemToDetailItem(item: PublicCalendarItemResponse, id: string, timezone: string, workspaceName: string) {
+  const color = item.color ?? {
+    preset: item.public ? 'BLUE' : 'SLATE',
+    background: item.public ? '#dbeafe' : '#e2e8f0',
+    foreground: item.public ? '#1e3a8a' : '#1e293b',
+    border: item.public ? '#93c5fd' : '#94a3b8',
+  } as const
+  return {
+    id,
+    title: item.title ?? 'Public block',
+    kind: item.sourceType === 'TASK' || item.sourceType === 'PROJECT' ? item.sourceType : 'EVENT',
+    dayIndex: 0,
+    startsAt: formatTimeInTimezone(new Date(item.startsAt), timezone),
+    endsAt: formatTimeInTimezone(new Date(item.endsAt), timezone),
+    visibility: 'PUBLIC',
+    busy: item.busy,
+    color: {
+      name: color.preset,
+      background: color.background,
+      foreground: color.foreground,
+      border: color.border,
+    },
+    owner: workspaceName,
+    status: item.busy ? 'BUSY' : 'AVAILABLE',
+    workspace: workspaceName,
+    project: undefined,
+    epic: undefined,
+    participants: [],
+    description: 'Public calendar entry.',
+    attachments: 0,
+    publicLabel: 'Public block',
+  } satisfies CalendarItem
+}
+
+function parsePublicEntryId(entryId?: string): [CalendarBlockSourceType | undefined, string | undefined] {
+  if (!entryId?.includes(':')) return [undefined, undefined]
+  const [sourceType, sourceId] = entryId.split(':')
+  if (sourceType !== 'EVENT' && sourceType !== 'TASK' && sourceType !== 'PROJECT') return [undefined, undefined]
+  return [sourceType, sourceId]
 }

@@ -170,7 +170,14 @@ Le flow normal commence par les pages publiques. Utiliser `Login` dans le header
 
 Le bootstrap du premier super admin est volontairement separe sur `/bootstrap` et demande une confirmation explicite. Ne l'utiliser que pour initialiser un serveur sans compte proprietaire.
 
-Par defaut, le frontend peut tourner avec des donnees mock pour permettre le travail UI sans seed backend. Une fois connecte, le workspace actif vient de la session. Pour forcer un workspace en dev sans session, renseigner l'id du workspace :
+Par defaut, le frontend ouvre le slug public `doni`. Le super admin peut ensuite changer le slug public et le fuseau par defaut depuis `Settings > Workspace setup`. Pour changer le slug public par defaut en dev avant que le backend soit seed :
+
+```bash
+export VITE_CALENDARY_PUBLIC_SLUG=<public-slug>
+bun run dev
+```
+
+Le frontend peut aussi tourner avec des donnees mock pour permettre le travail UI sans seed backend. Une fois connecte, le workspace actif vient de la session. Pour forcer un workspace en dev sans session, renseigner l'id du workspace :
 
 ```bash
 export VITE_CALENDARY_WORKSPACE_ID=<workspace-uuid>

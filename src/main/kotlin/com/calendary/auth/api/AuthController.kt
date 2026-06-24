@@ -31,10 +31,10 @@ class AuthController(
 	@PostMapping("/login")
 	fun login(
 		@Valid @RequestBody request: LoginRequest,
-		session: HttpSession,
+		httpRequest: HttpServletRequest,
 	): AuthenticatedUserResponse {
 		val user = auth.authenticate(LoginCommand(email = request.email, password = request.password))
-		sessions.signIn(session, user)
+		sessions.signIn(httpRequest, user)
 		return user.toAuthenticatedResponse()
 	}
 

@@ -16,6 +16,8 @@ interface CalendarBlockRepository : JpaRepository<CalendarBlock, UUID> {
 
 	fun findBySourceTypeAndSourceId(sourceType: CalendarBlockSourceType, sourceId: UUID): Optional<CalendarBlock>
 
+	fun findBySourceTypeAndSourceIdAndWorkspaceId(sourceType: CalendarBlockSourceType, sourceId: UUID, workspaceId: UUID): Optional<CalendarBlock>
+
 	fun existsByWorkspaceIdAndStartsAtLessThanAndEndsAtGreaterThanAndBusyIsTrue(
 		workspaceId: UUID,
 		endsBefore: Instant,

@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { PropsWithChildren } from 'react'
 import { WorkspaceSessionProvider } from './features/auth/workspace-session'
+import { NotificationSocketProvider } from './features/inbox/notification-socket-provider'
 import { ThemeProvider } from './features/theme/theme-provider'
 
 const queryClient = new QueryClient({
@@ -16,7 +17,9 @@ export function AppProviders({ children }: PropsWithChildren) {
   return (
     <QueryClientProvider client={queryClient}>
       <WorkspaceSessionProvider>
-        <ThemeProvider>{children}</ThemeProvider>
+        <NotificationSocketProvider>
+          <ThemeProvider>{children}</ThemeProvider>
+        </NotificationSocketProvider>
       </WorkspaceSessionProvider>
     </QueryClientProvider>
   )

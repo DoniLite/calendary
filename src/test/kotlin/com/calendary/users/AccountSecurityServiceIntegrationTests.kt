@@ -85,4 +85,48 @@ class AccountSecurityServiceIntegrationTests(
 			)
 		}
 	}
+
+	@Test
+	@Transactional
+	fun `new password must be different from current password`() {
+		val superAdmin = onboarding.bootstrapSuperAdmin(
+			BootstrapSuperAdminCommand(
+				email = "owner@calendary.dev",
+				password = "very-secret-password",
+			),
+		)
+
+		assertThrows<IllegalArgumentException> {
+			accountSecurity.changePassword(
+				ChangePasswordCommand(
+					userId = superAdmin.id,
+					currentPassword = "very-secret-password",
+					newPassword = "very-secret-password",
+				),
+			)
+		}
+	}
+
+	@Test
+	@Transactional
+	fun `disabled user cannot change password`() {
+		val superAdmin = onboarding.bootstrapSuperAdmin(
+			BootstrapSuperAdminCommand(
+				email = "owner@calendary.dev",
+				password = "very-secret-password",
+			),
+		)
+		val disabledUser = users.findById(superAdmin.id).orElseThrow()
+		disabledUser.status = UserStatus.DISABLED
+
+		assertThrows<IllegalStateException> {
+			accountSecurity.changePassword(
+				ChangePasswordCommand(
+					userId = superAdmin.id,
+					currentPassword = "very-secret-password",
+					newPassword = "new-secure-password",
+				),
+			)
+		}
+	}
 }

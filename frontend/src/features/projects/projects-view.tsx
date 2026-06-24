@@ -4,23 +4,21 @@ import { Badge } from '../../components/ui/badge'
 import { Panel, PanelBody, PanelHeader, PanelTitle } from '../../components/ui/panel'
 import { useWorkspaceSession } from '../auth/workspace-session'
 import { useProjectsQuery, type ProjectResponse } from '../../lib/api'
-import { projects, type ProjectItem } from '../../lib/demo-data'
+import type { ProjectItem } from '../../lib/demo-data'
 
 export function ProjectsView() {
   const { activeWorkspace, activeWorkspaceId, apiEnabled } = useWorkspaceSession()
   const canWrite = activeWorkspace?.accessLevel !== 'READ'
   const inCollaboratorPortal = useRouterState({ select: (state) => state.location.pathname.startsWith('/collab') })
   const projectsQuery = useProjectsQuery(activeWorkspaceId)
-  const visibleProjects = apiEnabled && projectsQuery.data ? projectsQuery.data.projects.map(toProjectItem) : projects
+  const visibleProjects = projectsQuery.data?.projects.map(toProjectItem) ?? []
 
   return (
     <div className="space-y-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold">Projects</h1>
-          <p className="text-sm text-muted-foreground">
-            {apiEnabled ? 'Projects and epics loaded from Calendary API.' : 'Projects, epics, progress and attachment-ready detail pages.'}
-          </p>
+          <p className="text-sm text-muted-foreground">Projects and epics loaded from Calendary API.</p>
         </div>
         {canWrite && (
           inCollaboratorPortal ? (
@@ -37,6 +35,7 @@ export function ProjectsView() {
         )}
       </div>
 
+      {!apiEnabled && <div className="rounded-md border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">Select a workspace to load its projects.</div>}
       {apiEnabled && projectsQuery.isPending && <div className="rounded-md border bg-card px-4 py-3 text-sm text-muted-foreground">Loading projects from backend...</div>}
       {apiEnabled && projectsQuery.isError && (
         <div className="rounded-md border border-busy/30 bg-busy/10 px-4 py-3 text-sm text-foreground">
@@ -72,7 +71,7 @@ export function ProjectsView() {
           </Panel>
         ))}
       </section>
-      {!visibleProjects.length && !projectsQuery.isPending && (
+      {apiEnabled && !visibleProjects.length && !projectsQuery.isPending && (
         <div className="rounded-md border bg-muted/40 px-4 py-6 text-center text-sm text-muted-foreground">
           No projects or epics in this workspace yet.
         </div>

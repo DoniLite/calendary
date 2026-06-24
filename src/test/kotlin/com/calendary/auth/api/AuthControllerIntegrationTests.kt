@@ -43,6 +43,38 @@ class AuthControllerIntegrationTests(
 
 	@Test
 	@Transactional
+	fun `login rotates existing session id`() {
+		onboarding.bootstrapSuperAdmin(
+			BootstrapSuperAdminCommand(
+				email = "owner@calendary.dev",
+				password = "very-secret-password",
+			),
+		)
+		val existingSession = MockHttpSession()
+		val initialSessionId = existingSession.id
+
+		val result = mockMvc.perform(
+			mvcPost("/api/auth/login")
+				.session(existingSession)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(
+					"""
+				{
+				  "email": "owner@calendary.dev",
+				  "password": "very-secret-password"
+				}
+					""".trimIndent(),
+				),
+		)
+			.andExpect(status().isOk)
+			.andReturn()
+
+		val authenticatedSession = result.request.session as MockHttpSession
+		kotlin.test.assertNotEquals(initialSessionId, authenticatedSession.id)
+	}
+
+	@Test
+	@Transactional
 	fun `rejects invalid login`() {
 		onboarding.bootstrapSuperAdmin(
 			BootstrapSuperAdminCommand(

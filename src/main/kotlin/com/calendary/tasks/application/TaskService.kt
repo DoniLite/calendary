@@ -5,16 +5,23 @@ import com.calendary.calendar.domain.CalendarBlockSourceType
 import com.calendary.calendar.domain.CalendarColorPreset
 import com.calendary.calendar.domain.CalendarVisibility
 import com.calendary.calendar.infra.CalendarBlockRepository
+import com.calendary.notifications.application.CreateNotificationCommand
+import com.calendary.notifications.application.NotificationService
+import com.calendary.notifications.domain.NotificationType
 import com.calendary.projects.domain.ProjectType
 import com.calendary.projects.infra.ProjectRepository
+import com.calendary.resources.domain.ResourceType
 import com.calendary.tasks.domain.Task
+import com.calendary.tasks.domain.TaskAssignee
 import com.calendary.tasks.domain.TaskPriority
 import com.calendary.tasks.domain.TaskStatus
 import com.calendary.tasks.infra.TaskRepository
+import com.calendary.users.domain.UserAccount
 import com.calendary.users.infra.UserAccountRepository
 import com.calendary.workspaces.application.WorkspaceAccessService
 import java.time.Instant
 import java.util.UUID
+import org.hibernate.Hibernate
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -25,6 +32,7 @@ class TaskService(
 	private val users: UserAccountRepository,
 	private val projects: ProjectRepository,
 	private val workspaceAccess: WorkspaceAccessService,
+	private val notifications: NotificationService,
 ) {
 	@Transactional
 	fun create(command: CreateTaskCommand): Task {
@@ -84,6 +92,8 @@ class TaskService(
 				),
 			)
 		}
+		syncAssignees(task, command.assigneeEmails, creator)
+		initializeAssignees(task)
 		return task
 	}
 
@@ -91,6 +101,15 @@ class TaskService(
 	fun list(workspaceId: UUID, userId: UUID): List<Task> {
 		workspaceAccess.requireRead(workspaceId, userId)
 		return tasks.findByWorkspaceIdOrderByCreatedAtDesc(workspaceId)
+			.onEach { initializeAssignees(it) }
+	}
+
+	@Transactional(readOnly = true)
+	fun get(workspaceId: UUID, taskId: UUID, userId: UUID): Task {
+		workspaceAccess.requireRead(workspaceId, userId)
+		return tasks.findByIdAndWorkspaceId(taskId, workspaceId)
+			.orElseThrow { IllegalArgumentException("Task not found.") }
+			.also { initializeAssignees(it) }
 	}
 
 	@Transactional
@@ -101,6 +120,8 @@ class TaskService(
 			require(command.plannedEnd.isAfter(command.plannedStart)) { "Task planned end must be after start." }
 		}
 		val workspace = workspaceAccess.requireWrite(command.workspaceId, command.userId)
+		val actor = users.findById(command.userId)
+			.orElseThrow { IllegalArgumentException("User not found.") }
 		val task = tasks.findByIdAndWorkspaceId(command.taskId, command.workspaceId)
 			.orElseThrow { IllegalArgumentException("Task not found.") }
 		val project = command.projectId?.let {
@@ -152,7 +173,56 @@ class TaskService(
 		} else {
 			existingBlock.ifPresent { calendarBlocks.delete(it) }
 		}
+		syncAssignees(task, command.assigneeEmails, actor)
+		initializeAssignees(task)
 		return task
+	}
+
+	@Transactional
+	fun updateStatus(workspaceId: UUID, taskId: UUID, userId: UUID, status: TaskStatus): Task {
+		workspaceAccess.requireWrite(workspaceId, userId)
+		val task = tasks.findByIdAndWorkspaceId(taskId, workspaceId)
+			.orElseThrow { IllegalArgumentException("Task not found.") }
+		task.status = status
+		calendarBlocks.findBySourceTypeAndSourceId(CalendarBlockSourceType.TASK, task.id)
+			.ifPresent { it.busy = status != TaskStatus.DONE && status != TaskStatus.ARCHIVED }
+		initializeAssignees(task)
+		return task
+	}
+
+	private fun initializeAssignees(task: Task) {
+		Hibernate.initialize(task.assignees)
+		task.assignees.forEach { Hibernate.initialize(it.user) }
+	}
+
+	private fun syncAssignees(task: Task, assigneeEmails: List<String>, actor: UserAccount) {
+		val resolved = assigneeEmails
+			.map { it.trim() }
+			.filter { it.isNotBlank() }
+			.distinctBy { it.lowercase() }
+			.map { email ->
+				users.findByEmailIgnoreCase(email)
+					.orElseThrow { IllegalArgumentException("Assignee not found: $email") }
+			}
+		val previousUserIds = task.assignees.mapNotNull { it.user?.id }.toSet()
+		val newAssignees = resolved.filterNot { previousUserIds.contains(it.id) }
+
+		task.assignees.clear()
+		resolved.forEach { user -> task.assignees.add(TaskAssignee(task = task, user = user)) }
+
+		newAssignees.forEach { user ->
+			notifications.notify(
+				CreateNotificationCommand(
+					recipientId = user.id,
+					type = NotificationType.TASK_ASSIGNED,
+					title = "You were assigned to a task",
+					body = "${actor.email} assigned you to \"${task.title}\".",
+					resourceType = ResourceType.TASK.name,
+					resourceId = task.id,
+					actionUrl = "/tasks/${task.id}",
+				),
+			)
+		}
 	}
 
 	@Transactional
@@ -183,6 +253,7 @@ data class CreateTaskCommand(
 	val plannedStart: Instant? = null,
 	val plannedEnd: Instant? = null,
 	val timezone: String = "UTC",
+	val assigneeEmails: List<String> = emptyList(),
 )
 
 data class UpdateTaskCommand(
@@ -203,4 +274,5 @@ data class UpdateTaskCommand(
 	val plannedStart: Instant? = null,
 	val plannedEnd: Instant? = null,
 	val timezone: String = "UTC",
+	val assigneeEmails: List<String> = emptyList(),
 )

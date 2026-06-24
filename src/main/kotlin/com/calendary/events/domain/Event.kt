@@ -5,6 +5,7 @@ import com.calendary.calendar.domain.CalendarVisibility
 import com.calendary.common.persistence.AuditableEntity
 import com.calendary.users.domain.UserAccount
 import com.calendary.workspaces.domain.Workspace
+import jakarta.persistence.CascadeType
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.EnumType
@@ -12,6 +13,7 @@ import jakarta.persistence.Enumerated
 import jakarta.persistence.FetchType
 import jakarta.persistence.JoinColumn
 import jakarta.persistence.ManyToOne
+import jakarta.persistence.OneToMany
 import jakarta.persistence.Table
 import java.time.Instant
 
@@ -58,4 +60,7 @@ open class Event(
 	@Enumerated(EnumType.STRING)
 	@Column(nullable = false)
 	open var status: EventStatus = EventStatus.CONFIRMED,
+
+	@OneToMany(mappedBy = "event", cascade = [CascadeType.ALL], orphanRemoval = true, fetch = FetchType.LAZY)
+	open var participants: MutableList<EventParticipant> = mutableListOf(),
 ) : AuditableEntity()

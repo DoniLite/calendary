@@ -38,6 +38,7 @@ out/
 
 ### Kotlin ###
 .kotlin
+.env
 
 ### Frontend ###
 frontend/node_modules/

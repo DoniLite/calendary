@@ -24,4 +24,5 @@ data class CreateTaskRequest(
 	val plannedStart: Instant? = null,
 	val plannedEnd: Instant? = null,
 	val timezone: String = "UTC",
+	val assigneeEmails: List<String> = emptyList(),
 )

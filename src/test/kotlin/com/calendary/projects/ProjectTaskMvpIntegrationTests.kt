@@ -77,7 +77,7 @@ class ProjectTaskMvpIntegrationTests(
 			.contentAsString
 			.let { JsonPath.read<String>(it, "$.id") }
 
-		mockMvc.perform(
+		val taskId = mockMvc.perform(
 			mvcPost("/api/workspaces/$workspaceId/tasks")
 				.session(session)
 				.contentType(MediaType.APPLICATION_JSON)
@@ -97,6 +97,15 @@ class ProjectTaskMvpIntegrationTests(
 			.andExpect(jsonPath("$.projectId").value(projectId))
 			.andExpect(jsonPath("$.epicId").value(epicId))
 			.andExpect(jsonPath("$.estimateMinutes").value(180))
+			.andReturn()
+			.response
+			.contentAsString
+			.let { JsonPath.read<String>(it, "$.id") }
+
+		mockMvc.perform(mvcGet("/api/workspaces/$workspaceId/tasks/$taskId").session(session))
+			.andExpect(status().isOk)
+			.andExpect(jsonPath("$.title").value("Implement project views"))
+			.andExpect(jsonPath("$.projectId").value(projectId))
 
 		mockMvc.perform(mvcGet("/api/workspaces/$workspaceId/projects").session(session))
 			.andExpect(status().isOk)

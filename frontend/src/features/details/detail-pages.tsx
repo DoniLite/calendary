@@ -1,9 +1,12 @@
-import { Link, useRouterState } from '@tanstack/react-router'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { Link, useParams, useRouterState } from '@tanstack/react-router'
 import { ArrowLeft, CalendarClock, CheckSquare2, Edit3, Layers3, Paperclip, Save } from 'lucide-react'
 import type { ReactNode } from 'react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { useForm } from 'react-hook-form'
 import { Badge } from '../../components/ui/badge'
 import { Button } from '../../components/ui/button'
+import { FieldError } from '../../components/ui/form-field'
 import { Panel, PanelBody, PanelHeader, PanelTitle } from '../../components/ui/panel'
 import { RichMarkdownEditor } from '../../components/rich-markdown-editor'
 import { useWorkspaceSession } from '../auth/workspace-session'
@@ -19,6 +22,7 @@ import {
   type CalendarVisibility,
   type EventResponse,
   type EventStatus,
+  type MemberSummaryResponse,
   type ProjectResponse,
   type ProjectStatus,
   type ProjectType,
@@ -27,7 +31,8 @@ import {
   type TaskResponse,
   type TaskStatus,
 } from '../../lib/api'
-import { calendarItems, itemColors, projects, tasks, type ItemColor } from '../../lib/demo-data'
+import { itemColors, type ItemColor } from '../../lib/demo-data'
+import { proposeCollaborationSchema, resourceFormSchema, type ProposeCollaborationFormValues, type ResourceFormValues } from '../../lib/schemas'
 import { cn } from '../../lib/utils'
 
 type ResourceKind = 'EVENT' | 'TASK' | 'PROJECT' | 'EPIC'
@@ -44,6 +49,18 @@ type ResourceDraft = {
   priority: string
   color: ItemColor
   markdown: string
+}
+
+function paramKeyFor(kind: ResourceKind): 'taskId' | 'projectId' | 'epicId' | 'eventId' {
+  if (kind === 'TASK') return 'taskId'
+  if (kind === 'PROJECT') return 'projectId'
+  if (kind === 'EPIC') return 'epicId'
+  return 'eventId'
+}
+
+function useResourceIdParam(kind: ResourceKind): string | undefined {
+  const params = useParams({ strict: false }) as Record<string, string | undefined>
+  return params[paramKeyFor(kind)]
 }
 
 const resourceMeta = {
@@ -101,28 +118,36 @@ export function EpicEditPage() {
   return <ResourceEditor kind="EPIC" mode="edit" />
 }
 
-function ResourceDetail({ kind }: { kind: ResourceKind }) {
-  const { activeWorkspace, activeWorkspaceId, apiEnabled } = useWorkspaceSession()
-  const pathname = useRouterState({ select: (state) => state.location.pathname })
-  const resourceId = pathname.split('/').at(-1)
-  const eventQuery = useEventQuery(activeWorkspaceId, kind === 'EVENT' ? resourceId : undefined)
-  const taskQuery = useTaskQuery(activeWorkspaceId, kind === 'TASK' ? resourceId : undefined)
-  const projectQuery = useProjectQuery(activeWorkspaceId, kind === 'PROJECT' || kind === 'EPIC' ? resourceId : undefined)
-  const apiDraft = kind === 'EVENT' && eventQuery.data
+function useResourceDraftQuery(kind: ResourceKind, workspaceId: string | undefined, resourceId: string | undefined) {
+  const eventQuery = useEventQuery(workspaceId, kind === 'EVENT' ? resourceId : undefined)
+  const taskQuery = useTaskQuery(workspaceId, kind === 'TASK' ? resourceId : undefined)
+  const projectQuery = useProjectQuery(workspaceId, kind === 'PROJECT' || kind === 'EPIC' ? resourceId : undefined)
+  const draft = kind === 'EVENT' && eventQuery.data
     ? draftFromEvent(eventQuery.data)
     : kind === 'TASK' && taskQuery.data
       ? draftFromTask(taskQuery.data)
       : (kind === 'PROJECT' || kind === 'EPIC') && projectQuery.data
         ? draftFromProject(projectQuery.data)
         : undefined
-  const draft = apiEnabled ? apiDraft ?? createInitialDraft(kind, 'edit', resourceId) : createInitialDraft(kind, 'edit', resourceId)
+  const members: MemberSummaryResponse[] = kind === 'TASK' ? taskQuery.data?.assignees ?? [] : kind === 'EVENT' ? eventQuery.data?.participants ?? [] : []
+  return {
+    draft,
+    members,
+    isPending: eventQuery.isPending || taskQuery.isPending || projectQuery.isPending,
+    isError: eventQuery.isError || taskQuery.isError || projectQuery.isError,
+  }
+}
+
+function ResourceDetail({ kind }: { kind: ResourceKind }) {
+  const { activeWorkspace, activeWorkspaceId, apiEnabled } = useWorkspaceSession()
+  const pathname = useRouterState({ select: (state) => state.location.pathname })
+  const resourceId = useResourceIdParam(kind)
+  const { draft, members, isPending, isError } = useResourceDraftQuery(kind, activeWorkspaceId, resourceId)
   const meta = resourceMeta[kind]
   const Icon = meta.icon
   const backTo = backRouteFor(kind, pathname)
   const canWrite = activeWorkspace?.accessLevel !== 'READ'
   const inCollaboratorPortal = pathname.startsWith('/collab')
-  const isLoading = apiEnabled && (eventQuery.isPending || taskQuery.isPending || projectQuery.isPending)
-  const isError = apiEnabled && (eventQuery.isError || taskQuery.isError || projectQuery.isError)
   const resourceType = resourceTypeFor(kind)
 
   return (
@@ -138,101 +163,103 @@ function ResourceDetail({ kind }: { kind: ResourceKind }) {
               <Icon className="h-5 w-5 text-muted-foreground" aria-hidden />
             </span>
             <div className="min-w-0">
-              <h1 className="truncate text-2xl font-semibold">{draft.title}</h1>
+              <h1 className="truncate text-2xl font-semibold">{draft?.title ?? meta.label}</h1>
               <p className="text-sm text-muted-foreground">{activeWorkspace?.name ?? 'Workspace'} · {meta.label} detail</p>
             </div>
           </div>
         </div>
-        {canWrite && <EditLink kind={kind} resourceId={resourceId ?? ''} inCollaboratorPortal={inCollaboratorPortal} />}
+        {canWrite && draft && <EditLink kind={kind} resourceId={resourceId ?? ''} inCollaboratorPortal={inCollaboratorPortal} />}
       </div>
 
-      {isLoading && <div className="rounded-md border bg-card px-4 py-3 text-sm text-muted-foreground">Loading resource from backend...</div>}
-      {isError && <div className="rounded-md border border-busy/30 bg-busy/10 px-4 py-3 text-sm">Unable to load this resource from the API.</div>}
+      {!apiEnabled && <div className="rounded-md border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">Select a workspace to view this resource.</div>}
+      {apiEnabled && isPending && <div className="rounded-md border bg-card px-4 py-3 text-sm text-muted-foreground">Loading resource from backend...</div>}
+      {apiEnabled && isError && <div className="rounded-md border border-busy/30 bg-busy/10 px-4 py-3 text-sm">Unable to load this resource from the API.</div>}
+      {apiEnabled && !isPending && !isError && !draft && <div className="rounded-md border border-busy/30 bg-busy/10 px-4 py-3 text-sm">Resource not found.</div>}
 
-      <section className="grid gap-4 xl:grid-cols-[1fr_360px]">
-        <div className="space-y-4">
-          <Panel>
-            <PanelHeader>
-              <PanelTitle>Overview</PanelTitle>
-            </PanelHeader>
-            <PanelBody className="space-y-4">
-              <div className="flex flex-wrap gap-2">
-                <Badge tone={kind === 'TASK' ? 'task' : kind === 'EVENT' ? 'event' : 'project'}>{kind}</Badge>
-                <Badge tone={draft.visibility === 'PUBLIC' ? 'success' : 'muted'}>{draft.visibility}</Badge>
-                <Badge tone="muted">{draft.status}</Badge>
-                {kind === 'TASK' && <Badge tone={draft.priority === 'URGENT' ? 'danger' : 'task'}>{draft.priority}</Badge>}
-              </div>
-              <div className="grid gap-3 text-sm sm:grid-cols-2">
-                <DetailRow label="Workspace" value={activeWorkspace?.name ?? 'Demo workspace'} />
-                <DetailRow label="Access" value={activeWorkspace?.accessLevel ?? 'Demo'} />
-                {(kind === 'EVENT' || kind === 'TASK') && <DetailRow label="Time" value={`${draft.startsAt} - ${draft.endsAt}`} />}
-                {draft.project && <DetailRow label="Project" value={draft.project} />}
-                {draft.epic && <DetailRow label="Epic" value={draft.epic} />}
-              </div>
-            </PanelBody>
-          </Panel>
+      {draft && (
+        <section className="grid gap-4 xl:grid-cols-[1fr_360px]">
+          <div className="space-y-4">
+            <Panel>
+              <PanelHeader>
+                <PanelTitle>Overview</PanelTitle>
+              </PanelHeader>
+              <PanelBody className="space-y-4">
+                <div className="flex flex-wrap gap-2">
+                  <Badge tone={kind === 'TASK' ? 'task' : kind === 'EVENT' ? 'event' : 'project'}>{kind}</Badge>
+                  <Badge tone={draft.visibility === 'PUBLIC' ? 'success' : 'muted'}>{draft.visibility}</Badge>
+                  <Badge tone="muted">{draft.status}</Badge>
+                  {kind === 'TASK' && <Badge tone={draft.priority === 'URGENT' ? 'danger' : 'task'}>{draft.priority}</Badge>}
+                </div>
+                <div className="grid gap-3 text-sm sm:grid-cols-2">
+                  <DetailRow label="Workspace" value={activeWorkspace?.name ?? 'Workspace'} />
+                  <DetailRow label="Access" value={activeWorkspace?.accessLevel ?? 'READ'} />
+                  {(kind === 'EVENT' || kind === 'TASK') && <DetailRow label="Time" value={`${draft.startsAt} - ${draft.endsAt}`} />}
+                  {draft.project && <DetailRow label="Project" value={draft.project} />}
+                  {draft.epic && <DetailRow label="Epic" value={draft.epic} />}
+                </div>
+                {(kind === 'TASK' || kind === 'EVENT') && (
+                  <div className="space-y-2">
+                    <div className="text-xs font-medium text-muted-foreground">{kind === 'TASK' ? 'Assignees' : 'Participants'}</div>
+                    <div className="flex flex-wrap gap-2">
+                      {!members.length && <span className="text-sm text-muted-foreground">None yet</span>}
+                      {members.map((member) => (
+                        <Badge key={member.id} tone="muted">{member.email}</Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </PanelBody>
+            </Panel>
 
-          <Panel>
-            <PanelHeader>
-              <PanelTitle>Description</PanelTitle>
-            </PanelHeader>
-            <PanelBody>
-              <article className="prose prose-sm max-w-none whitespace-pre-wrap text-sm leading-6 text-foreground">
-                {draft.markdown}
-              </article>
-            </PanelBody>
-          </Panel>
-        </div>
+            <Panel>
+              <PanelHeader>
+                <PanelTitle>Description</PanelTitle>
+              </PanelHeader>
+              <PanelBody>
+                <article className="prose prose-sm max-w-none whitespace-pre-wrap text-sm leading-6 text-foreground">
+                  {draft.markdown}
+                </article>
+              </PanelBody>
+            </Panel>
+          </div>
 
-        <aside className="space-y-4">
-          <Panel>
-            <PanelHeader>
-              <PanelTitle>Publication</PanelTitle>
-            </PanelHeader>
-            <PanelBody className="space-y-3 text-sm text-muted-foreground">
-              <div className="rounded-md border p-3" style={{ backgroundColor: draft.color.background, color: draft.color.foreground, borderColor: draft.color.border }}>
-                <div className="font-semibold">{draft.color.name}</div>
-                <div className="mt-1 opacity-80">{draft.visibility.toLowerCase()} visibility</div>
-              </div>
-              <p>Public resources may appear on the visitor calendar. Private resources are masked as busy time.</p>
-            </PanelBody>
-          </Panel>
+          <aside className="space-y-4">
+            <Panel>
+              <PanelHeader>
+                <PanelTitle>Publication</PanelTitle>
+              </PanelHeader>
+              <PanelBody className="space-y-3 text-sm text-muted-foreground">
+                <div className="rounded-md border p-3" style={{ backgroundColor: draft.color.background, color: draft.color.foreground, borderColor: draft.color.border }}>
+                  <div className="font-semibold">{draft.color.name}</div>
+                  <div className="mt-1 opacity-80">{draft.visibility.toLowerCase()} visibility</div>
+                </div>
+                <p>Public resources may appear on the visitor calendar. Private resources are masked as busy time.</p>
+              </PanelBody>
+            </Panel>
 
-          <Panel>
-            <PanelHeader>
-              <PanelTitle>Attachments</PanelTitle>
-            </PanelHeader>
-            <AttachmentPanel resourceType={resourceType} resourceId={resourceId} canWrite={canWrite} apiEnabled={apiEnabled} />
-          </Panel>
+            <Panel>
+              <PanelHeader>
+                <PanelTitle>Attachments</PanelTitle>
+              </PanelHeader>
+              <AttachmentPanel resourceType={resourceType} resourceId={resourceId} canWrite={canWrite} />
+            </Panel>
 
-          <Panel>
-            <PanelHeader>
-              <PanelTitle>Collaboration</PanelTitle>
-            </PanelHeader>
-            <CollaborationPanel resourceType={resourceType} resourceId={resourceId} canWrite={canWrite} apiEnabled={apiEnabled} />
-          </Panel>
-        </aside>
-      </section>
+            <Panel>
+              <PanelHeader>
+                <PanelTitle>Collaboration</PanelTitle>
+              </PanelHeader>
+              <CollaborationPanel resourceType={resourceType} resourceId={resourceId} canWrite={canWrite} />
+            </Panel>
+          </aside>
+        </section>
+      )}
     </div>
   )
 }
 
-function AttachmentPanel({ resourceType, resourceId, canWrite, apiEnabled }: { resourceType: ResourceType; resourceId?: string; canWrite: boolean; apiEnabled: boolean }) {
-  const attachmentsQuery = useAttachmentQuery(resourceType, resourceId, apiEnabled)
+function AttachmentPanel({ resourceType, resourceId, canWrite }: { resourceType: ResourceType; resourceId?: string; canWrite: boolean }) {
+  const attachmentsQuery = useAttachmentQuery(resourceType, resourceId)
   const mutations = useAttachmentMutations(resourceType, resourceId)
-
-  if (!apiEnabled) {
-    return (
-      <PanelBody className="space-y-3">
-        {['brief.pdf', 'screenshot.png'].map((file) => (
-          <div key={file} className="flex items-center justify-between rounded-md border px-3 py-2 text-sm">
-            <span className="truncate">{file}</span>
-            <Badge tone="muted">Demo</Badge>
-          </div>
-        ))}
-      </PanelBody>
-    )
-  }
 
   return (
     <PanelBody className="space-y-3">
@@ -273,28 +300,33 @@ function AttachmentPanel({ resourceType, resourceId, canWrite, apiEnabled }: { r
   )
 }
 
-function CollaborationPanel({ resourceType, resourceId, canWrite, apiEnabled }: { resourceType: ResourceType; resourceId?: string; canWrite: boolean; apiEnabled: boolean }) {
-  const [email, setEmail] = useState('')
-  const [accessLevel, setAccessLevel] = useState<'READ' | 'WRITE'>('READ')
-  const [message, setMessage] = useState('')
+function CollaborationPanel({ resourceType, resourceId, canWrite }: { resourceType: ResourceType; resourceId?: string; canWrite: boolean }) {
   const { proposeCollaboration } = useCollaborationMutations()
-  const disabled = !apiEnabled || !canWrite || !resourceId || proposeCollaboration.isPending
+  const disabled = !canWrite || !resourceId || proposeCollaboration.isPending
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors },
+  } = useForm<ProposeCollaborationFormValues>({
+    resolver: zodResolver(proposeCollaborationSchema),
+    defaultValues: { email: '', accessLevel: 'READ', message: '' },
+  })
+
+  function onSubmit(values: ProposeCollaborationFormValues) {
+    if (!resourceId) return
+    proposeCollaboration.mutate({ resourceType, resourceId, recipientEmail: values.email, accessLevel: values.accessLevel, message: values.message }, {
+      onSuccess: () => reset(),
+    })
+  }
 
   return (
     <PanelBody>
-      <form className="space-y-3" onSubmit={(event) => {
-        event.preventDefault()
-        if (!resourceId) return
-        proposeCollaboration.mutate({ resourceType, resourceId, recipientEmail: email, accessLevel, message }, {
-          onSuccess: () => {
-            setEmail('')
-            setMessage('')
-          },
-        })
-      }}>
-        <input className="h-9 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="collaborator@example.com" required disabled={disabled} />
+      <form className="space-y-3" onSubmit={handleSubmit(onSubmit)}>
+        <input className="h-9 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" type="email" placeholder="collaborator@example.com" disabled={disabled} {...register('email')} />
+        <FieldError message={errors.email?.message} />
         <div className="grid grid-cols-2 gap-2">
-          <select className="h-9 rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" value={accessLevel} onChange={(event) => setAccessLevel(event.target.value as 'READ' | 'WRITE')} disabled={disabled}>
+          <select className="h-9 rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" disabled={disabled} {...register('accessLevel')}>
             <option value="READ">Read</option>
             <option value="WRITE">Write</option>
           </select>
@@ -302,8 +334,7 @@ function CollaborationPanel({ resourceType, resourceId, canWrite, apiEnabled }: 
             {proposeCollaboration.isPending ? 'Sending' : 'Propose'}
           </Button>
         </div>
-        <textarea className="min-h-20 w-full rounded-md border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring" value={message} onChange={(event) => setMessage(event.target.value)} placeholder="Context for the collaborator" disabled={disabled} />
-        {!apiEnabled && <p className="text-xs text-muted-foreground">Sign in and select a workspace to propose collaboration.</p>}
+        <textarea className="min-h-20 w-full rounded-md border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring" placeholder="Context for the collaborator" disabled={disabled} {...register('message')} />
         {proposeCollaboration.isSuccess && <p className="text-xs text-available">Collaboration proposal sent.</p>}
         {proposeCollaboration.isError && <p className="text-xs text-busy">Unable to propose collaboration.</p>}
       </form>
@@ -353,32 +384,70 @@ function ResourceEditor({ kind, mode }: { kind: ResourceKind; mode: EditorMode }
   const canWrite = activeWorkspace?.accessLevel !== 'READ'
   const pathname = useRouterState({ select: (state) => state.location.pathname })
   const backTo = backRouteFor(kind, pathname)
-  const resourceId = pathname.split('/').at(-2)
+  const resourceId = useResourceIdParam(kind)
   const meta = resourceMeta[kind]
   const Icon = meta.icon
-  const initialDraft = useMemo(() => createInitialDraft(kind, mode, resourceId), [kind, mode, resourceId])
-  const [draft, setDraft] = useState<ResourceDraft>(initialDraft)
-  const [localSaved, setLocalSaved] = useState(false)
+  const initialDraft = useMemo(() => createInitialDraft(kind), [kind])
+  const [color, setColor] = useState<ItemColor>(initialDraft.color)
+  const [markdown, setMarkdown] = useState(initialDraft.markdown)
   const mutations = useResourceMutations(activeWorkspaceId)
   const activeMutation = mutationFor(kind, mode, mutations)
+  const {
+    register,
+    handleSubmit,
+    watch,
+    reset,
+  } = useForm<ResourceFormValues>({
+    resolver: zodResolver(resourceFormSchema),
+    defaultValues: toFormValues(initialDraft),
+  })
+  const status = watch('status')
+  const visibility = watch('visibility')
 
-  function updateDraft<Key extends keyof ResourceDraft>(key: Key, value: ResourceDraft[Key]) {
-    setDraft((current) => ({ ...current, [key]: value }))
-    setLocalSaved(false)
+  const editResourceId = mode === 'edit' ? resourceId : undefined
+  const { draft: loadedDraft, isPending: isLoadingResource, isError: loadError } = useResourceDraftQuery(kind, activeWorkspaceId, editResourceId)
+
+  useEffect(() => {
+    if (!loadedDraft) return
+    reset(toFormValues(loadedDraft))
+    setColor(loadedDraft.color)
+    setMarkdown(loadedDraft.markdown)
+  }, [loadedDraft, reset])
+
+  if (mode === 'edit' && !apiEnabled) {
+    return (
+      <div className="space-y-5">
+        <BackLink backTo={backTo} />
+        <div className="rounded-md border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">Select a workspace to edit this resource.</div>
+      </div>
+    )
   }
 
-  async function handleSave() {
-    if (!canWrite) {
-      return
-    }
+  if (mode === 'edit' && isLoadingResource) {
+    return (
+      <div className="space-y-5">
+        <BackLink backTo={backTo} />
+        <div className="rounded-md border bg-card px-4 py-3 text-sm text-muted-foreground">Loading resource from backend...</div>
+      </div>
+    )
+  }
 
-    if (!apiEnabled) {
-      setLocalSaved(true)
+  if (mode === 'edit' && (loadError || !loadedDraft)) {
+    return (
+      <div className="space-y-5">
+        <BackLink backTo={backTo} />
+        <div className="rounded-md border border-busy/30 bg-busy/10 px-4 py-3 text-sm">Unable to load this resource from the API.</div>
+      </div>
+    )
+  }
+
+  async function onSave(values: ResourceFormValues) {
+    if (!canWrite || !apiEnabled) {
       return
     }
 
     if (kind === 'TASK') {
-      const payload = toTaskPayload(draft)
+      const payload = toTaskPayload(values, color, markdown)
       let savedId = resourceId
       if (mode === 'create') {
         const saved = await mutations.createTask.mutateAsync(payload)
@@ -392,7 +461,7 @@ function ResourceEditor({ kind, mode }: { kind: ResourceKind; mode: EditorMode }
     }
 
     if (kind === 'PROJECT' || kind === 'EPIC') {
-      const payload = toProjectPayload(draft, kind)
+      const payload = toProjectPayload(values, color, markdown, kind)
       let savedId = resourceId
       if (mode === 'create') {
         const saved = await mutations.createProject.mutateAsync(payload)
@@ -405,7 +474,7 @@ function ResourceEditor({ kind, mode }: { kind: ResourceKind; mode: EditorMode }
       return
     }
 
-    const payload = toEventPayload(draft)
+    const payload = toEventPayload(values, color, markdown)
     let savedId = resourceId
     if (mode === 'create') {
       const saved = await mutations.createEvent.mutateAsync(payload)
@@ -418,7 +487,7 @@ function ResourceEditor({ kind, mode }: { kind: ResourceKind; mode: EditorMode }
   }
 
   return (
-    <div className="space-y-5">
+    <form className="space-y-5" onSubmit={handleSubmit(onSave)}>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <Link to={backTo} className="mb-3 inline-flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground">
@@ -430,14 +499,14 @@ function ResourceEditor({ kind, mode }: { kind: ResourceKind; mode: EditorMode }
               <Icon className="h-5 w-5 text-muted-foreground" aria-hidden />
             </span>
             <div className="min-w-0">
-              <h1 className="truncate text-2xl font-semibold">{mode === 'create' ? `Create ${meta.label.toLowerCase()}` : `Edit ${draft.title}`}</h1>
+              <h1 className="truncate text-2xl font-semibold">{mode === 'create' ? `Create ${meta.label.toLowerCase()}` : `Edit ${loadedDraft?.title ?? initialDraft.title}`}</h1>
               <p className="text-sm text-muted-foreground">
                 {mode === 'create' ? 'Prepare the resource before it is saved to your workspace.' : `${meta.label} edition workspace`}
               </p>
             </div>
           </div>
         </div>
-        <Button onClick={() => void handleSave()} disabled={activeMutation.isPending || !canWrite}>
+        <Button type="submit" disabled={activeMutation.isPending || !canWrite}>
           <Save className="h-4 w-4" aria-hidden />
           {!canWrite ? 'Read only' : activeMutation.isPending ? 'Saving' : mode === 'create' ? 'Create' : 'Save'}
         </Button>
@@ -449,9 +518,9 @@ function ResourceEditor({ kind, mode }: { kind: ResourceKind; mode: EditorMode }
         </div>
       )}
 
-      {!apiEnabled && localSaved && (
-        <div className="rounded-md border border-available/30 bg-available/10 px-4 py-3 text-sm text-foreground">
-          Draft saved locally for this mock session. Sign in and select a workspace to persist through the backend.
+      {!apiEnabled && (
+        <div className="rounded-md border border-busy/30 bg-busy/10 px-4 py-3 text-sm text-foreground">
+          Select a workspace to save this resource.
         </div>
       )}
 
@@ -477,15 +546,13 @@ function ResourceEditor({ kind, mode }: { kind: ResourceKind; mode: EditorMode }
               <Field label="Title" className="md:col-span-2">
                 <input
                   className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
-                  value={draft.title}
-                  onChange={(event) => updateDraft('title', event.target.value)}
+                  {...register('title')}
                 />
               </Field>
               <Field label="Status">
                 <select
                   className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
-                  value={draft.status}
-                  onChange={(event) => updateDraft('status', event.target.value)}
+                  {...register('status')}
                 >
                   {statusOptionsFor(kind).map((status) => (
                     <option key={status} value={status}>
@@ -497,8 +564,7 @@ function ResourceEditor({ kind, mode }: { kind: ResourceKind; mode: EditorMode }
               <Field label="Visibility">
                 <select
                   className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
-                  value={draft.visibility}
-                  onChange={(event) => updateDraft('visibility', event.target.value as ResourceDraft['visibility'])}
+                  {...register('visibility')}
                 >
                   <option value="PRIVATE">Private</option>
                   <option value="PUBLIC">Public</option>
@@ -510,16 +576,14 @@ function ResourceEditor({ kind, mode }: { kind: ResourceKind; mode: EditorMode }
                     <input
                       className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
                       type="time"
-                      value={draft.startsAt}
-                      onChange={(event) => updateDraft('startsAt', event.target.value)}
+                      {...register('startsAt')}
                     />
                   </Field>
                   <Field label="Ends at">
                     <input
                       className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
                       type="time"
-                      value={draft.endsAt}
-                      onChange={(event) => updateDraft('endsAt', event.target.value)}
+                      {...register('endsAt')}
                     />
                   </Field>
                 </>
@@ -528,8 +592,7 @@ function ResourceEditor({ kind, mode }: { kind: ResourceKind; mode: EditorMode }
                 <Field label="Project">
                   <input
                     className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
-                    value={draft.project}
-                    onChange={(event) => updateDraft('project', event.target.value)}
+                    {...register('project')}
                   />
                 </Field>
               )}
@@ -538,15 +601,13 @@ function ResourceEditor({ kind, mode }: { kind: ResourceKind; mode: EditorMode }
                   <Field label="Epic">
                     <input
                       className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
-                      value={draft.epic}
-                      onChange={(event) => updateDraft('epic', event.target.value)}
+                      {...register('epic')}
                     />
                   </Field>
                   <Field label="Priority">
                     <select
                       className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
-                      value={draft.priority}
-                      onChange={(event) => updateDraft('priority', event.target.value)}
+                      {...register('priority')}
                     >
                       {['LOW', 'MEDIUM', 'HIGH', 'URGENT'].map((priority) => (
                         <option key={priority} value={priority}>
@@ -555,7 +616,23 @@ function ResourceEditor({ kind, mode }: { kind: ResourceKind; mode: EditorMode }
                       ))}
                     </select>
                   </Field>
+                  <Field label="Assignees (emails, comma separated)" className="md:col-span-2">
+                    <input
+                      className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
+                      placeholder="alice@calendary.dev, bob@calendary.dev"
+                      {...register('assigneeEmails')}
+                    />
+                  </Field>
                 </>
+              )}
+              {kind === 'EVENT' && (
+                <Field label="Participants (emails, comma separated)" className="md:col-span-2">
+                  <input
+                    className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
+                    placeholder="alice@calendary.dev, bob@calendary.dev"
+                    {...register('assigneeEmails')}
+                  />
+                </Field>
               )}
             </PanelBody>
           </Panel>
@@ -565,7 +642,7 @@ function ResourceEditor({ kind, mode }: { kind: ResourceKind; mode: EditorMode }
               <PanelTitle>Description</PanelTitle>
             </PanelHeader>
             <PanelBody className="p-3">
-              <RichMarkdownEditor value={draft.markdown} onChange={(value) => updateDraft('markdown', value)} label={`${meta.label} description`} />
+              <RichMarkdownEditor value={markdown} onChange={setMarkdown} label={`${meta.label} description`} />
             </PanelBody>
           </Panel>
         </div>
@@ -576,16 +653,17 @@ function ResourceEditor({ kind, mode }: { kind: ResourceKind; mode: EditorMode }
               <PanelTitle>Color</PanelTitle>
             </PanelHeader>
             <PanelBody className="grid grid-cols-2 gap-2">
-              {itemColors.map((color) => {
-                const selected = draft.color.name === color.name
+              {itemColors.map((item) => {
+                const selected = color.name === item.name
                 return (
                   <button
-                    key={color.name}
+                    key={item.name}
+                    type="button"
                     className={cn('rounded-md border px-3 py-2 text-left text-xs font-medium ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', selected && 'ring-2 ring-ring')}
-                    style={{ backgroundColor: color.background, color: color.foreground, borderColor: color.border }}
-                    onClick={() => updateDraft('color', color)}
+                    style={{ backgroundColor: item.background, color: item.foreground, borderColor: item.border }}
+                    onClick={() => setColor(item)}
                   >
-                    {color.name}
+                    {item.name}
                   </button>
                 )
               })}
@@ -599,8 +677,8 @@ function ResourceEditor({ kind, mode }: { kind: ResourceKind; mode: EditorMode }
             <PanelBody className="space-y-3">
               <div className="flex flex-wrap gap-2">
                 <Badge tone={kind === 'TASK' ? 'task' : kind === 'EVENT' ? 'event' : 'project'}>{kind}</Badge>
-                <Badge tone={draft.visibility === 'PUBLIC' ? 'success' : 'muted'}>{draft.visibility}</Badge>
-                <Badge tone="muted">{draft.status}</Badge>
+                <Badge tone={visibility === 'PUBLIC' ? 'success' : 'muted'}>{visibility}</Badge>
+                <Badge tone="muted">{status}</Badge>
               </div>
               <p className="text-sm leading-6 text-muted-foreground">
                 Public resources can appear on the visitor calendar. Private busy time stays masked behind a generic busy block.
@@ -615,19 +693,22 @@ function ResourceEditor({ kind, mode }: { kind: ResourceKind; mode: EditorMode }
             <PanelBody className="space-y-3">
               <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
                 <Paperclip className="mb-2 h-4 w-4" aria-hidden />
-                Drop PDF or image attachments here. Files will be stored in B2.
+                Save this {meta.label.toLowerCase()} first, then attach PDF or image files from its detail page.
               </div>
-              {['brief.pdf', 'screenshot.png'].map((file) => (
-                <div key={file} className="flex items-center justify-between rounded-md border px-3 py-2 text-sm">
-                  <span className="truncate">{file}</span>
-                  <Badge tone="muted">B2</Badge>
-                </div>
-              ))}
             </PanelBody>
           </Panel>
         </aside>
       </section>
-    </div>
+    </form>
+  )
+}
+
+function BackLink({ backTo }: { backTo: ReturnType<typeof backRouteFor> }) {
+  return (
+    <Link to={backTo} className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground">
+      <ArrowLeft className="h-4 w-4" aria-hidden />
+      Back
+    </Link>
   )
 }
 
@@ -656,12 +737,7 @@ function DetailRow({ label, value }: { label: string; value: string }) {
   )
 }
 
-function createInitialDraft(kind: ResourceKind, mode: EditorMode, resourceId?: string): ResourceDraft {
-  if (mode === 'edit') {
-    const existing = findExistingResource(kind, resourceId)
-    if (existing) return existing
-  }
-
+function createInitialDraft(kind: ResourceKind): ResourceDraft {
   return {
     title: `Untitled ${resourceMeta[kind].label.toLowerCase()}`,
     status: statusOptionsFor(kind)[0],
@@ -747,72 +823,6 @@ function formatTimeInput(value: string) {
   return new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(value))
 }
 
-function findExistingResource(kind: ResourceKind, resourceId?: string): ResourceDraft | undefined {
-  if (kind === 'TASK') {
-    const task = tasks.find((item) => item.id === resourceId)
-    if (!task) return undefined
-    return {
-      title: task.title,
-      status: task.status,
-      visibility: 'PRIVATE',
-      startsAt: '09:00',
-      endsAt: '10:00',
-      project: task.project,
-      epic: task.epic,
-      priority: task.priority,
-      color: task.color,
-      markdown: `# ${task.title}
-
-Project: ${task.project}
-
-Epic: ${task.epic}
-`,
-    }
-  }
-
-  if (kind === 'PROJECT' || kind === 'EPIC') {
-    const project = projects.find((item) => item.id === resourceId)
-    if (!project) return undefined
-    return {
-      title: project.title,
-      status: project.status,
-      visibility: 'PRIVATE',
-      startsAt: '09:00',
-      endsAt: '10:00',
-      project: kind === 'EPIC' ? 'Calendary MVP' : '',
-      epic: '',
-      priority: 'MEDIUM',
-      color: project.color,
-      markdown: `# ${project.title}
-
-Progress: ${project.progress}%
-
-Tasks: ${project.tasks}
-`,
-    }
-  }
-
-  const event = calendarItems.find((item) => item.id === resourceId)
-  if (!event) return undefined
-  return {
-    title: event.title,
-    status: event.status,
-    visibility: event.visibility,
-    startsAt: event.startsAt,
-    endsAt: event.endsAt,
-    project: event.project ?? '',
-    epic: event.epic ?? '',
-    priority: 'MEDIUM',
-    color: event.color,
-    markdown: `# ${event.title}
-
-${event.description}
-
-Participants: ${event.participants.join(', ') || 'none'}
-`,
-  }
-}
-
 function statusOptionsFor(kind: ResourceKind) {
   if (kind === 'EVENT') return ['TENTATIVE', 'CONFIRMED', 'CANCELLED']
   if (kind === 'TASK') return ['BACKLOG', 'TODO', 'IN_PROGRESS', 'REVIEW', 'DONE']
@@ -825,49 +835,72 @@ function mutationFor(kind: ResourceKind, mode: EditorMode, mutations: ReturnType
   return mode === 'create' ? mutations.createEvent : mutations.updateEvent
 }
 
-function toTaskPayload(draft: ResourceDraft) {
+function toFormValues(draft: ResourceDraft): ResourceFormValues {
   return {
     title: draft.title,
-    description: draft.markdown,
-    status: draft.status as TaskStatus,
-    priority: draft.priority as TaskPriority,
-    visibility: draft.visibility as CalendarVisibility,
-    colorPreset: colorPresetFromItem(draft.color, 'GREEN'),
+    status: draft.status,
+    visibility: draft.visibility,
+    startsAt: draft.startsAt,
+    endsAt: draft.endsAt,
+    project: draft.project,
+    epic: draft.epic,
+    priority: draft.priority,
+    assigneeEmails: '',
+  }
+}
+
+function parseEmailList(value: string): string[] {
+  return value
+    .split(',')
+    .map((email) => email.trim())
+    .filter(Boolean)
+}
+
+function toTaskPayload(values: ResourceFormValues, color: ItemColor, markdown: string) {
+  return {
+    title: values.title,
+    description: markdown,
+    status: values.status as TaskStatus,
+    priority: values.priority as TaskPriority,
+    visibility: values.visibility,
+    colorPreset: colorPresetFromItem(color, 'GREEN'),
     dueAt: null,
     projectId: null,
     epicId: null,
     parentTaskId: null,
     estimateMinutes: null,
-    plannedStart: toInstant(draft.startsAt),
-    plannedEnd: toInstant(draft.endsAt),
+    plannedStart: toInstant(values.startsAt),
+    plannedEnd: toInstant(values.endsAt),
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+    assigneeEmails: parseEmailList(values.assigneeEmails),
   }
 }
 
-function toProjectPayload(draft: ResourceDraft, kind: ResourceKind) {
+function toProjectPayload(values: ResourceFormValues, color: ItemColor, markdown: string, kind: ResourceKind) {
   return {
-    title: draft.title,
-    description: draft.markdown,
+    title: values.title,
+    description: markdown,
     type: (kind === 'EPIC' ? 'EPIC' : 'PROJECT') as ProjectType,
-    status: draft.status as ProjectStatus,
-    visibility: draft.visibility as CalendarVisibility,
-    colorPreset: colorPresetFromItem(draft.color, 'ORANGE'),
+    status: values.status as ProjectStatus,
+    visibility: values.visibility,
+    colorPreset: colorPresetFromItem(color, 'ORANGE'),
     parentProjectId: null,
     startsAt: null,
     dueAt: null,
   }
 }
 
-function toEventPayload(draft: ResourceDraft) {
+function toEventPayload(values: ResourceFormValues, color: ItemColor, markdown: string) {
   return {
-    title: draft.title,
-    description: draft.markdown,
-    startsAt: toInstant(draft.startsAt),
-    endsAt: toInstant(draft.endsAt),
+    title: values.title,
+    description: markdown,
+    startsAt: toInstant(values.startsAt),
+    endsAt: toInstant(values.endsAt),
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
-    visibility: draft.visibility as CalendarVisibility,
-    colorPreset: colorPresetFromItem(draft.color, 'BLUE'),
-    status: draft.status as EventStatus,
+    visibility: values.visibility,
+    colorPreset: colorPresetFromItem(color, 'BLUE'),
+    status: values.status as EventStatus,
+    participantEmails: parseEmailList(values.assigneeEmails),
   }
 }
 

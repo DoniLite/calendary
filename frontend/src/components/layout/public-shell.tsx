@@ -1,14 +1,18 @@
 import { Link, Outlet, useRouterState } from '@tanstack/react-router'
 import { CalendarDays, Clock, LogIn, Mail } from 'lucide-react'
 import { ThemeSwitcher } from '../../features/theme/theme-switcher'
+import { fallbackPublicSlug, usePublicWorkspaceProfileQuery } from '../../lib/api'
 import { cn } from '../../lib/utils'
 
 export function PublicShell() {
   const pathname = useRouterState({ select: (state) => state.location.pathname })
+  const publicSlug = publicSlugFromPath(pathname)
+  const profileQuery = usePublicWorkspaceProfileQuery(publicSlug)
+  const profileName = profileQuery.data?.name ?? (publicSlug === 'doni' ? 'Doni' : publicSlug)
   const navItems = [
-    { to: '/p/doni/calendar', label: 'Calendar', icon: CalendarDays, primary: false },
-    { to: '/p/doni/availability', label: 'Availability', icon: Clock, primary: false },
-    { to: '/p/doni/request', label: 'Request', icon: Mail, primary: true },
+    { to: '/p/$publicSlug/calendar', params: { publicSlug }, href: `/p/${publicSlug}/calendar`, label: 'Calendar', icon: CalendarDays, primary: false },
+    { to: '/p/$publicSlug/availability', params: { publicSlug }, href: `/p/${publicSlug}/availability`, label: 'Availability', icon: Clock, primary: false },
+    { to: '/p/$publicSlug/request', params: { publicSlug }, href: `/p/${publicSlug}/request`, label: 'Request', icon: Mail, primary: true },
   ] as const
 
   return (
@@ -16,10 +20,10 @@ export function PublicShell() {
       <header className="border-b bg-card">
         <div className="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-4 md:flex-row md:items-center md:justify-between">
           <div className="flex items-center justify-between gap-4">
-            <Link to="/p/doni/calendar" className="flex min-w-0 items-center gap-3">
-              <img src="/avatar.jpeg" alt="Doni" className="h-11 w-11 rounded-md border object-cover" />
+            <Link to="/p/$publicSlug/calendar" params={{ publicSlug }} className="flex min-w-0 items-center gap-3">
+              <img src="/avatar.jpeg" alt={profileName} className="h-11 w-11 rounded-md border object-cover" />
               <div className="min-w-0">
-                <div className="truncate text-base font-semibold">Doni</div>
+                <div className="truncate text-base font-semibold">{profileName}</div>
                 <div className="truncate text-sm text-muted-foreground">Public calendar</div>
               </div>
             </Link>
@@ -31,14 +35,14 @@ export function PublicShell() {
           <nav className="grid grid-cols-3 gap-2 md:flex md:items-center">
             {navItems.map((item) => {
               const Icon = item.icon
-              const active = pathname === item.to
               return (
                 <Link
                   key={item.to}
                   to={item.to}
+                  params={item.params}
                   className={cn(
                     'inline-flex h-9 items-center justify-center gap-2 rounded-md px-2 text-sm font-medium sm:px-3',
-                    active
+                    pathname === item.href || pathname.startsWith(`${item.href}/`)
                       ? 'bg-primary text-primary-foreground hover:bg-primary/90'
                       : 'border bg-background hover:bg-muted',
                   )}
@@ -66,4 +70,9 @@ export function PublicShell() {
       </main>
     </div>
   )
+}
+
+function publicSlugFromPath(pathname: string) {
+  const [, section, slug] = pathname.split('/')
+  return section === 'p' && slug ? slug : fallbackPublicSlug
 }

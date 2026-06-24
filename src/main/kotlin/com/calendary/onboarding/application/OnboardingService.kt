@@ -59,6 +59,7 @@ class OnboardingService(
 		val workspace = workspaces.save(
 			Workspace(
 				name = command.workspaceName.ifBlank { "Calendary" },
+				publicSlug = uniqueWorkspaceSlug(command.workspaceName.ifBlank { "Calendary" }),
 				type = WorkspaceType.PERSONAL,
 				owner = superAdmin,
 			),
@@ -142,6 +143,7 @@ class OnboardingService(
 		val collaboratorWorkspace = workspaces.save(
 			Workspace(
 				name = command.workspaceName.ifBlank { "${collaborator.email} workspace" },
+				publicSlug = uniqueWorkspaceSlug(command.workspaceName.ifBlank { "${collaborator.email} workspace" }),
 				type = WorkspaceType.PERSONAL,
 				owner = collaborator,
 			),
@@ -182,6 +184,20 @@ class OnboardingService(
 	}
 
 	private fun String.normalizedEmail(): String = trim().lowercase()
+
+	private fun uniqueWorkspaceSlug(name: String): String {
+		val base = name.slugified().ifBlank { "workspace" }
+		if (workspaces.findByPublicSlugIgnoreCase(base).isEmpty) {
+			return base
+		}
+		return "$base-${UUID.randomUUID().toString().take(8)}"
+	}
+
+	private fun String.slugified(): String =
+		lowercase()
+			.replace(Regex("[^a-z0-9]+"), "-")
+			.trim('-')
+			.take(96)
 }
 
 data class BootstrapSuperAdminCommand(

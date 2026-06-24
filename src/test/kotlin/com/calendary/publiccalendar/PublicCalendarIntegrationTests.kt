@@ -5,6 +5,7 @@ import com.calendary.onboarding.application.OnboardingService
 import com.calendary.support.PostgresIntegrationTest
 import com.calendary.workspaces.domain.WorkspaceType
 import com.calendary.workspaces.infra.WorkspaceRepository
+import com.jayway.jsonpath.JsonPath
 import kotlin.test.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.http.MediaType
@@ -28,8 +29,8 @@ class PublicCalendarIntegrationTests(
 	fun `public calendar masks private occupations and shows public occupations`() {
 		val workspaceId = bootstrapWorkspace()
 		val session = loginAs("owner@calendary.dev", "very-secret-password")
-		createEvent(workspaceId, session, "Private focus", "PRIVATE", "2026-07-01T09:00:00Z", "2026-07-01T10:00:00Z")
-		createEvent(workspaceId, session, "Public workshop", "PUBLIC", "2026-07-01T11:00:00Z", "2026-07-01T12:00:00Z")
+		val privateEventId = createEvent(workspaceId, session, "Private focus", "PRIVATE", "2026-07-01T09:00:00Z", "2026-07-01T10:00:00Z")
+		val publicEventId = createEvent(workspaceId, session, "Public workshop", "PUBLIC", "2026-07-01T11:00:00Z", "2026-07-01T12:00:00Z")
 
 		mockMvc.get("/public/workspaces/$workspaceId/calendar") {
 			param("start", "2026-07-01T00:00:00Z")
@@ -40,8 +41,24 @@ class PublicCalendarIntegrationTests(
 				jsonPath("$.items.length()") { value(2) }
 				jsonPath("$.items[0].public") { value(false) }
 				jsonPath("$.items[0].title") { doesNotExist() }
+				jsonPath("$.items[0].sourceId") { doesNotExist() }
 				jsonPath("$.items[1].public") { value(true) }
+				jsonPath("$.items[1].sourceId") { value(publicEventId) }
 				jsonPath("$.items[1].title") { value("Public workshop") }
+			}
+
+		mockMvc.get("/public/workspaces/$workspaceId/calendar/EVENT/$publicEventId")
+			.andExpect {
+				status { isOk() }
+				jsonPath("$.public") { value(true) }
+				jsonPath("$.sourceId") { value(publicEventId) }
+				jsonPath("$.title") { value("Public workshop") }
+			}
+
+		mockMvc.get("/public/workspaces/$workspaceId/calendar/EVENT/$privateEventId")
+			.andExpect {
+				status { isBadRequest() }
+				jsonPath("$.code") { value("bad_request") }
 			}
 	}
 
@@ -131,8 +148,8 @@ class PublicCalendarIntegrationTests(
 		visibility: String,
 		startsAt: String,
 		endsAt: String,
-	) {
-		mockMvc.perform(
+	): String {
+		return mockMvc.perform(
 			mvcPost("/api/workspaces/$workspaceId/events")
 				.session(session)
 				.contentType(MediaType.APPLICATION_JSON)
@@ -148,6 +165,10 @@ class PublicCalendarIntegrationTests(
 				),
 		)
 			.andExpect(status().isCreated)
+			.andReturn()
+			.response
+			.contentAsString
+			.let { JsonPath.read<String>(it, "$.id") }
 	}
 
 	private fun bootstrapWorkspace(): java.util.UUID {

@@ -7,8 +7,8 @@ import { Panel, PanelBody, PanelHeader, PanelTitle } from '../../components/ui/p
 import { TabBar, TabButton } from '../../components/ui/tabs'
 import { useWorkspaceSession } from '../auth/workspace-session'
 import { useCalendarQuery, type CalendarItemResponse } from '../../lib/api'
-import { calendarItems, itemColors, type CalendarItem } from '../../lib/demo-data'
-import { convertWallClockRange, dayIndexInTimezone, formatTimeInTimezone } from '../../lib/timezone'
+import { itemColors, type CalendarItem } from '../../lib/demo-data'
+import { dayIndexInTimezone, formatTimeInTimezone } from '../../lib/timezone'
 
 const hours = Array.from({ length: 18 }, (_, index) => 7 + index)
 const hourHeight = 88
@@ -27,9 +27,7 @@ export function CalendarView() {
   const days = useMemo(() => Array.from({ length: 7 }, (_, index) => addDays(weekStart, index)), [weekStart])
   const visibleDays = mode === 'day' ? [{ date: days[0], dayIndex: 0 }] : days.map((date, dayIndex) => ({ date, dayIndex }))
   const calendarQuery = useCalendarQuery(activeWorkspaceId, weekStart, weekEnd)
-  const calendarData = apiEnabled && calendarQuery.data
-    ? calendarQuery.data.items.map((item) => toCalendarItem(item, days, timezone, activeWorkspace?.name, user?.email))
-    : calendarItems.map((item) => convertWallClockRange(item, days, timezone))
+  const calendarData = calendarQuery.data?.items.map((item) => toCalendarItem(item, days, timezone, activeWorkspace?.name, user?.email)) ?? []
   const [selectedId, setSelectedId] = useState(calendarData[0]?.id)
   const selected = calendarData.find((item) => item.id === selectedId) ?? calendarData[0]
 
@@ -38,9 +36,7 @@ export function CalendarView() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold">Calendar</h1>
-          <p className="text-sm text-muted-foreground">
-            {apiEnabled ? `${activeWorkspace?.name ?? 'Workspace'} planning loaded from Calendary API.` : 'Scrollable week planning with overlaps, long blocks and public visibility.'}
-          </p>
+          <p className="text-sm text-muted-foreground">{activeWorkspace?.name ?? 'Workspace'} planning loaded from Calendary API.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <TabBar>
@@ -82,13 +78,14 @@ export function CalendarView() {
         </div>
       </div>
 
+      {!apiEnabled && <div className="rounded-md border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">Select a workspace to load its calendar.</div>}
       {apiEnabled && calendarQuery.isPending && <div className="rounded-md border bg-card px-4 py-3 text-sm text-muted-foreground">Loading calendar from backend...</div>}
       {apiEnabled && calendarQuery.isError && (
         <div className="rounded-md border border-busy/30 bg-busy/10 px-4 py-3 text-sm text-foreground">
           Unable to load backend calendar. Check your session and workspace access.
         </div>
       )}
-      {!calendarData.length && !calendarQuery.isPending && (
+      {apiEnabled && !calendarData.length && !calendarQuery.isPending && (
         <div className="rounded-md border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
           No calendar blocks in this period.
         </div>
@@ -268,26 +265,27 @@ function CalendarDetails({ item, inCollaboratorPortal }: { item: CalendarItem; i
 }
 
 function CalendarItemLink({ item, inCollaboratorPortal }: { item: CalendarItem; inCollaboratorPortal: boolean }) {
+  const resourceId = item.sourceId ?? item.id
   if (item.kind === 'TASK') {
     return inCollaboratorPortal ? (
-      <Link to="/collab/tasks/$taskId" params={{ taskId: item.id }} className="inline-flex h-9 items-center justify-center rounded-md border bg-background px-3 text-sm font-medium hover:bg-muted">Browse details</Link>
+      <Link to="/collab/tasks/$taskId" params={{ taskId: resourceId }} className="inline-flex h-9 items-center justify-center rounded-md border bg-background px-3 text-sm font-medium hover:bg-muted">Browse details</Link>
     ) : (
-      <Link to="/app/tasks/$taskId" params={{ taskId: item.id }} className="inline-flex h-9 items-center justify-center rounded-md border bg-background px-3 text-sm font-medium hover:bg-muted">Browse details</Link>
+      <Link to="/app/tasks/$taskId" params={{ taskId: resourceId }} className="inline-flex h-9 items-center justify-center rounded-md border bg-background px-3 text-sm font-medium hover:bg-muted">Browse details</Link>
     )
   }
 
   if (item.kind === 'PROJECT') {
     return inCollaboratorPortal ? (
-      <Link to="/collab/projects/$projectId" params={{ projectId: item.id }} className="inline-flex h-9 items-center justify-center rounded-md border bg-background px-3 text-sm font-medium hover:bg-muted">Browse details</Link>
+      <Link to="/collab/projects/$projectId" params={{ projectId: resourceId }} className="inline-flex h-9 items-center justify-center rounded-md border bg-background px-3 text-sm font-medium hover:bg-muted">Browse details</Link>
     ) : (
-      <Link to="/app/projects/$projectId" params={{ projectId: item.id }} className="inline-flex h-9 items-center justify-center rounded-md border bg-background px-3 text-sm font-medium hover:bg-muted">Browse details</Link>
+      <Link to="/app/projects/$projectId" params={{ projectId: resourceId }} className="inline-flex h-9 items-center justify-center rounded-md border bg-background px-3 text-sm font-medium hover:bg-muted">Browse details</Link>
     )
   }
 
   return inCollaboratorPortal ? (
-    <Link to="/collab/events/$eventId" params={{ eventId: item.id }} className="inline-flex h-9 items-center justify-center rounded-md border bg-background px-3 text-sm font-medium hover:bg-muted">Browse details</Link>
+    <Link to="/collab/events/$eventId" params={{ eventId: resourceId }} className="inline-flex h-9 items-center justify-center rounded-md border bg-background px-3 text-sm font-medium hover:bg-muted">Browse details</Link>
   ) : (
-    <Link to="/app/events/$eventId" params={{ eventId: item.id }} className="inline-flex h-9 items-center justify-center rounded-md border bg-background px-3 text-sm font-medium hover:bg-muted">Browse details</Link>
+    <Link to="/app/events/$eventId" params={{ eventId: resourceId }} className="inline-flex h-9 items-center justify-center rounded-md border bg-background px-3 text-sm font-medium hover:bg-muted">Browse details</Link>
   )
 }
 
@@ -321,6 +319,7 @@ function toCalendarItem(item: CalendarItemResponse, days: Date[], timezone: stri
   const endsAt = new Date(item.endsAt)
   return {
     id: item.id,
+    sourceId: item.sourceId,
     title: item.title,
     kind: item.sourceType,
     dayIndex: dayIndexInTimezone(startsAt, days, timezone),

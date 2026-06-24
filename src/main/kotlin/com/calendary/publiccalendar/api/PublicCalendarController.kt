@@ -3,12 +3,15 @@ package com.calendary.publiccalendar.api
 import com.calendary.booking.api.dto.BookingRequestResponse
 import com.calendary.booking.api.dto.CreateBookingRequest
 import com.calendary.booking.api.dto.toResponse
+import com.calendary.calendar.domain.CalendarBlockSourceType
 import com.calendary.booking.application.BookingRequestService
 import com.calendary.booking.application.CreateBookingRequestCommand
+import com.calendary.publiccalendar.api.dto.PublicCalendarItemResponse
 import com.calendary.publiccalendar.api.dto.PublicCalendarResponse
 import com.calendary.publiccalendar.api.dto.PublicAvailabilityResponse
 import com.calendary.publiccalendar.api.dto.toResponse
 import com.calendary.publiccalendar.application.PublicAvailabilityQuery
+import com.calendary.publiccalendar.application.PublicCalendarItemQuery
 import com.calendary.publiccalendar.application.PublicCalendarQuery
 import com.calendary.publiccalendar.application.PublicCalendarService
 import jakarta.validation.Valid
@@ -41,6 +44,20 @@ class PublicCalendarController(
 				workspaceId = workspaceId,
 				start = start,
 				end = end,
+			),
+		).toResponse()
+
+	@GetMapping("/calendar/{sourceType}/{sourceId}")
+	fun getCalendarItem(
+		@PathVariable workspaceId: UUID,
+		@PathVariable sourceType: CalendarBlockSourceType,
+		@PathVariable sourceId: UUID,
+	): PublicCalendarItemResponse =
+		publicCalendar.getPublicCalendarItem(
+			PublicCalendarItemQuery(
+				workspaceId = workspaceId,
+				sourceType = sourceType,
+				sourceId = sourceId,
 			),
 		).toResponse()
 
