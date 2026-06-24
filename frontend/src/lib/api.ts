@@ -1,8 +1,5 @@
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 
-export const fallbackWorkspaceId = import.meta.env.VITE_CALENDARY_WORKSPACE_ID?.trim() || ''
-export const fallbackPublicSlug = import.meta.env.VITE_CALENDARY_PUBLIC_SLUG?.trim() || 'doni'
-
 export type CalendarColorPreset = 'ORANGE' | 'BLUE' | 'GREEN' | 'ROSE' | 'VIOLET' | 'SLATE' | 'AMBER'
 export type CalendarVisibility = 'PRIVATE' | 'PUBLIC'
 export type TaskStatus = 'BACKLOG' | 'TODO' | 'IN_PROGRESS' | 'REVIEW' | 'DONE'
@@ -395,6 +392,14 @@ export function useProjectsQuery(workspaceId?: string, type?: ProjectType) {
   return useApiQuery<ProjectListResponse>(['projects', workspaceId ?? 'none', type ?? 'all'], `/api/workspaces/${workspaceId}/projects${query}`, Boolean(workspaceId))
 }
 
+export type MemberListResponse = {
+  items: MemberSummaryResponse[]
+}
+
+export function useWorkspaceMembersQuery(workspaceId?: string) {
+  return useApiQuery<MemberListResponse>(['workspace-members', workspaceId ?? 'none'], `/api/workspaces/${workspaceId}/members`, Boolean(workspaceId))
+}
+
 export function useCalendarQuery(workspaceId: string | undefined, start: Date, end: Date) {
   const startIso = start.toISOString()
   const endIso = end.toISOString()
@@ -404,6 +409,10 @@ export function useCalendarQuery(workspaceId: string | undefined, start: Date, e
 
 export function usePublicWorkspaceProfileQuery(publicSlug?: string) {
   return useApiQuery<PublicWorkspaceProfileResponse>(['public-profile', publicSlug ?? 'none'], `/public/profiles/${publicSlug}`, Boolean(publicSlug))
+}
+
+export function fetchDefaultPublicProfile() {
+  return apiGet<PublicWorkspaceProfileResponse>('/public/profiles/default')
 }
 
 export function useEventQuery(workspaceId?: string, eventId?: string) {

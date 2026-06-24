@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { Badge } from '../../components/ui/badge'
 import { Button } from '../../components/ui/button'
+import { Combobox, MultiCombobox, type ComboboxOption } from '../../components/ui/combobox'
 import { FieldError } from '../../components/ui/form-field'
 import { Panel, PanelBody, PanelHeader, PanelTitle } from '../../components/ui/panel'
 import { RichMarkdownEditor } from '../../components/rich-markdown-editor'
@@ -16,8 +17,11 @@ import {
   useCollaborationMutations,
   useEventQuery,
   useProjectQuery,
+  useProjectsQuery,
   useResourceMutations,
   useTaskQuery,
+  useTasksQuery,
+  useWorkspaceMembersQuery,
   type CalendarColorPreset,
   type CalendarVisibility,
   type EventResponse,
@@ -44,8 +48,10 @@ type ResourceDraft = {
   visibility: 'PRIVATE' | 'PUBLIC'
   startsAt: string
   endsAt: string
-  project: string
-  epic: string
+  projectId: string | null
+  epicId: string | null
+  parentTaskId: string | null
+  assigneeEmails: string[]
   priority: string
   color: ItemColor
   markdown: string
@@ -130,11 +136,12 @@ function useResourceDraftQuery(kind: ResourceKind, workspaceId: string | undefin
         ? draftFromProject(projectQuery.data)
         : undefined
   const members: MemberSummaryResponse[] = kind === 'TASK' ? taskQuery.data?.assignees ?? [] : kind === 'EVENT' ? eventQuery.data?.participants ?? [] : []
+  const activeQuery = kind === 'EVENT' ? eventQuery : kind === 'TASK' ? taskQuery : projectQuery
   return {
     draft,
     members,
-    isPending: eventQuery.isPending || taskQuery.isPending || projectQuery.isPending,
-    isError: eventQuery.isError || taskQuery.isError || projectQuery.isError,
+    isPending: resourceId !== undefined && activeQuery.isPending,
+    isError: activeQuery.isError,
   }
 }
 
@@ -143,6 +150,10 @@ function ResourceDetail({ kind }: { kind: ResourceKind }) {
   const pathname = useRouterState({ select: (state) => state.location.pathname })
   const resourceId = useResourceIdParam(kind)
   const { draft, members, isPending, isError } = useResourceDraftQuery(kind, activeWorkspaceId, resourceId)
+  const projectsQuery = useProjectsQuery(activeWorkspaceId, 'PROJECT')
+  const epicsQuery = useProjectsQuery(activeWorkspaceId, 'EPIC')
+  const projectTitle = projectsQuery.data?.projects.find((project) => project.id === draft?.projectId)?.title
+  const epicTitle = epicsQuery.data?.projects.find((epic) => epic.id === draft?.epicId)?.title
   const meta = resourceMeta[kind]
   const Icon = meta.icon
   const backTo = backRouteFor(kind, pathname)
@@ -194,8 +205,8 @@ function ResourceDetail({ kind }: { kind: ResourceKind }) {
                   <DetailRow label="Workspace" value={activeWorkspace?.name ?? 'Workspace'} />
                   <DetailRow label="Access" value={activeWorkspace?.accessLevel ?? 'READ'} />
                   {(kind === 'EVENT' || kind === 'TASK') && <DetailRow label="Time" value={`${draft.startsAt} - ${draft.endsAt}`} />}
-                  {draft.project && <DetailRow label="Project" value={draft.project} />}
-                  {draft.epic && <DetailRow label="Epic" value={draft.epic} />}
+                  {projectTitle && <DetailRow label="Project" value={projectTitle} />}
+                  {epicTitle && <DetailRow label="Epic" value={epicTitle} />}
                 </div>
                 {(kind === 'TASK' || kind === 'EVENT') && (
                   <div className="space-y-2">
@@ -390,6 +401,10 @@ function ResourceEditor({ kind, mode }: { kind: ResourceKind; mode: EditorMode }
   const initialDraft = useMemo(() => createInitialDraft(kind), [kind])
   const [color, setColor] = useState<ItemColor>(initialDraft.color)
   const [markdown, setMarkdown] = useState(initialDraft.markdown)
+  const [projectId, setProjectId] = useState<string | undefined>(initialDraft.projectId ?? undefined)
+  const [epicId, setEpicId] = useState<string | undefined>(initialDraft.epicId ?? undefined)
+  const [parentTaskId, setParentTaskId] = useState<string | undefined>(initialDraft.parentTaskId ?? undefined)
+  const [assigneeEmails, setAssigneeEmails] = useState<string[]>(initialDraft.assigneeEmails)
   const mutations = useResourceMutations(activeWorkspaceId)
   const activeMutation = mutationFor(kind, mode, mutations)
   const {
@@ -404,6 +419,17 @@ function ResourceEditor({ kind, mode }: { kind: ResourceKind; mode: EditorMode }
   const status = watch('status')
   const visibility = watch('visibility')
 
+  const projectsQuery = useProjectsQuery(activeWorkspaceId, 'PROJECT')
+  const epicsQuery = useProjectsQuery(activeWorkspaceId, 'EPIC')
+  const tasksQuery = useTasksQuery(activeWorkspaceId)
+  const membersQuery = useWorkspaceMembersQuery(activeWorkspaceId)
+  const projectOptions: ComboboxOption[] = projectsQuery.data?.projects.map((project) => ({ value: project.id, label: project.title })) ?? []
+  const epicOptions: ComboboxOption[] = epicsQuery.data?.projects.map((epic) => ({ value: epic.id, label: epic.title })) ?? []
+  const parentTaskOptions: ComboboxOption[] = (tasksQuery.data?.items ?? [])
+    .filter((task) => task.id !== resourceId)
+    .map((task) => ({ value: task.id, label: task.title }))
+  const memberOptions: ComboboxOption[] = membersQuery.data?.items.map((member) => ({ value: member.email, label: member.email })) ?? []
+
   const editResourceId = mode === 'edit' ? resourceId : undefined
   const { draft: loadedDraft, isPending: isLoadingResource, isError: loadError } = useResourceDraftQuery(kind, activeWorkspaceId, editResourceId)
 
@@ -412,6 +438,10 @@ function ResourceEditor({ kind, mode }: { kind: ResourceKind; mode: EditorMode }
     reset(toFormValues(loadedDraft))
     setColor(loadedDraft.color)
     setMarkdown(loadedDraft.markdown)
+    setProjectId(loadedDraft.projectId ?? undefined)
+    setEpicId(loadedDraft.epicId ?? undefined)
+    setParentTaskId(loadedDraft.parentTaskId ?? undefined)
+    setAssigneeEmails(loadedDraft.assigneeEmails)
   }, [loadedDraft, reset])
 
   if (mode === 'edit' && !apiEnabled) {
@@ -446,8 +476,10 @@ function ResourceEditor({ kind, mode }: { kind: ResourceKind; mode: EditorMode }
       return
     }
 
+    const relations: RelationState = { projectId, epicId, parentTaskId, assigneeEmails }
+
     if (kind === 'TASK') {
-      const payload = toTaskPayload(values, color, markdown)
+      const payload = toTaskPayload(values, color, markdown, relations)
       let savedId = resourceId
       if (mode === 'create') {
         const saved = await mutations.createTask.mutateAsync(payload)
@@ -461,7 +493,7 @@ function ResourceEditor({ kind, mode }: { kind: ResourceKind; mode: EditorMode }
     }
 
     if (kind === 'PROJECT' || kind === 'EPIC') {
-      const payload = toProjectPayload(values, color, markdown, kind)
+      const payload = toProjectPayload(values, color, markdown, kind, relations)
       let savedId = resourceId
       if (mode === 'create') {
         const saved = await mutations.createProject.mutateAsync(payload)
@@ -474,7 +506,7 @@ function ResourceEditor({ kind, mode }: { kind: ResourceKind; mode: EditorMode }
       return
     }
 
-    const payload = toEventPayload(values, color, markdown)
+    const payload = toEventPayload(values, color, markdown, relations)
     let savedId = resourceId
     if (mode === 'create') {
       const saved = await mutations.createEvent.mutateAsync(payload)
@@ -590,18 +622,36 @@ function ResourceEditor({ kind, mode }: { kind: ResourceKind; mode: EditorMode }
               )}
               {(kind === 'TASK' || kind === 'EPIC') && (
                 <Field label="Project">
-                  <input
-                    className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
-                    {...register('project')}
+                  <Combobox
+                    options={projectOptions}
+                    value={projectId}
+                    onChange={setProjectId}
+                    placeholder="Link a project"
+                    searchPlaceholder="Search projects..."
+                    emptyText="No project found."
                   />
                 </Field>
               )}
               {kind === 'TASK' && (
                 <>
                   <Field label="Epic">
-                    <input
-                      className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
-                      {...register('epic')}
+                    <Combobox
+                      options={epicOptions}
+                      value={epicId}
+                      onChange={setEpicId}
+                      placeholder="Link an epic"
+                      searchPlaceholder="Search epics..."
+                      emptyText="No epic found."
+                    />
+                  </Field>
+                  <Field label="Parent task">
+                    <Combobox
+                      options={parentTaskOptions}
+                      value={parentTaskId}
+                      onChange={setParentTaskId}
+                      placeholder="Link a parent task"
+                      searchPlaceholder="Search tasks..."
+                      emptyText="No task found."
                     />
                   </Field>
                   <Field label="Priority">
@@ -616,21 +666,27 @@ function ResourceEditor({ kind, mode }: { kind: ResourceKind; mode: EditorMode }
                       ))}
                     </select>
                   </Field>
-                  <Field label="Assignees (emails, comma separated)" className="md:col-span-2">
-                    <input
-                      className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
-                      placeholder="alice@calendary.dev, bob@calendary.dev"
-                      {...register('assigneeEmails')}
+                  <Field label="Assignees" className="md:col-span-2">
+                    <MultiCombobox
+                      options={memberOptions}
+                      values={assigneeEmails}
+                      onChange={setAssigneeEmails}
+                      placeholder="Assign collaborators"
+                      searchPlaceholder="Search members..."
+                      emptyText="No member found."
                     />
                   </Field>
                 </>
               )}
               {kind === 'EVENT' && (
-                <Field label="Participants (emails, comma separated)" className="md:col-span-2">
-                  <input
-                    className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
-                    placeholder="alice@calendary.dev, bob@calendary.dev"
-                    {...register('assigneeEmails')}
+                <Field label="Participants" className="md:col-span-2">
+                  <MultiCombobox
+                    options={memberOptions}
+                    values={assigneeEmails}
+                    onChange={setAssigneeEmails}
+                    placeholder="Add participants"
+                    searchPlaceholder="Search members..."
+                    emptyText="No member found."
                   />
                 </Field>
               )}
@@ -744,8 +800,10 @@ function createInitialDraft(kind: ResourceKind): ResourceDraft {
     visibility: 'PRIVATE',
     startsAt: '09:00',
     endsAt: '10:00',
-    project: kind === 'PROJECT' ? '' : 'Calendary MVP',
-    epic: '',
+    projectId: null,
+    epicId: null,
+    parentTaskId: null,
+    assigneeEmails: [],
     priority: 'MEDIUM',
     color: itemColors[kind === 'EVENT' ? 1 : kind === 'TASK' ? 2 : 0],
     markdown: `# Untitled ${resourceMeta[kind].label.toLowerCase()}
@@ -762,8 +820,10 @@ function draftFromEvent(event: EventResponse): ResourceDraft {
     visibility: event.visibility,
     startsAt: formatTimeInput(event.startsAt),
     endsAt: formatTimeInput(event.endsAt),
-    project: '',
-    epic: '',
+    projectId: null,
+    epicId: null,
+    parentTaskId: null,
+    assigneeEmails: event.participants.map((participant) => participant.email),
     priority: 'MEDIUM',
     color: itemColorFromPreset(event.color),
     markdown: event.description,
@@ -777,8 +837,10 @@ function draftFromTask(task: TaskResponse): ResourceDraft {
     visibility: task.visibility,
     startsAt: '09:00',
     endsAt: '10:00',
-    project: task.projectId ?? '',
-    epic: task.epicId ?? '',
+    projectId: task.projectId,
+    epicId: task.epicId,
+    parentTaskId: task.parentTaskId,
+    assigneeEmails: task.assignees.map((assignee) => assignee.email),
     priority: task.priority,
     color: itemColorFromPreset(task.color),
     markdown: task.description,
@@ -792,8 +854,10 @@ function draftFromProject(project: ProjectResponse): ResourceDraft {
     visibility: project.visibility,
     startsAt: project.startsAt ? formatTimeInput(project.startsAt) : '09:00',
     endsAt: project.dueAt ? formatTimeInput(project.dueAt) : '10:00',
-    project: project.parentProjectId ?? '',
-    epic: '',
+    projectId: project.parentProjectId,
+    epicId: null,
+    parentTaskId: null,
+    assigneeEmails: [],
     priority: 'MEDIUM',
     color: itemColorFromPreset(project.color),
     markdown: project.description,
@@ -842,21 +906,18 @@ function toFormValues(draft: ResourceDraft): ResourceFormValues {
     visibility: draft.visibility,
     startsAt: draft.startsAt,
     endsAt: draft.endsAt,
-    project: draft.project,
-    epic: draft.epic,
     priority: draft.priority,
-    assigneeEmails: '',
   }
 }
 
-function parseEmailList(value: string): string[] {
-  return value
-    .split(',')
-    .map((email) => email.trim())
-    .filter(Boolean)
+type RelationState = {
+  projectId?: string
+  epicId?: string
+  parentTaskId?: string
+  assigneeEmails: string[]
 }
 
-function toTaskPayload(values: ResourceFormValues, color: ItemColor, markdown: string) {
+function toTaskPayload(values: ResourceFormValues, color: ItemColor, markdown: string, relations: RelationState) {
   return {
     title: values.title,
     description: markdown,
@@ -865,18 +926,18 @@ function toTaskPayload(values: ResourceFormValues, color: ItemColor, markdown: s
     visibility: values.visibility,
     colorPreset: colorPresetFromItem(color, 'GREEN'),
     dueAt: null,
-    projectId: null,
-    epicId: null,
-    parentTaskId: null,
+    projectId: relations.projectId ?? null,
+    epicId: relations.epicId ?? null,
+    parentTaskId: relations.parentTaskId ?? null,
     estimateMinutes: null,
     plannedStart: toInstant(values.startsAt),
     plannedEnd: toInstant(values.endsAt),
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
-    assigneeEmails: parseEmailList(values.assigneeEmails),
+    assigneeEmails: relations.assigneeEmails,
   }
 }
 
-function toProjectPayload(values: ResourceFormValues, color: ItemColor, markdown: string, kind: ResourceKind) {
+function toProjectPayload(values: ResourceFormValues, color: ItemColor, markdown: string, kind: ResourceKind, relations: RelationState) {
   return {
     title: values.title,
     description: markdown,
@@ -884,13 +945,13 @@ function toProjectPayload(values: ResourceFormValues, color: ItemColor, markdown
     status: values.status as ProjectStatus,
     visibility: values.visibility,
     colorPreset: colorPresetFromItem(color, 'ORANGE'),
-    parentProjectId: null,
+    parentProjectId: relations.projectId ?? null,
     startsAt: null,
     dueAt: null,
   }
 }
 
-function toEventPayload(values: ResourceFormValues, color: ItemColor, markdown: string) {
+function toEventPayload(values: ResourceFormValues, color: ItemColor, markdown: string, relations: RelationState) {
   return {
     title: values.title,
     description: markdown,
@@ -900,7 +961,7 @@ function toEventPayload(values: ResourceFormValues, color: ItemColor, markdown: 
     visibility: values.visibility,
     colorPreset: colorPresetFromItem(color, 'BLUE'),
     status: values.status as EventStatus,
-    participantEmails: parseEmailList(values.assigneeEmails),
+    participantEmails: relations.assigneeEmails,
   }
 }
 

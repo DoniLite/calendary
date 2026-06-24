@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { CalendarPlus, CheckCircle2, ChevronLeft, ChevronRight, Clock, Globe2, Lock, Mail, MessageSquare, User } from 'lucide-react'
-import { Link, useRouterState } from '@tanstack/react-router'
+import { Link, useParams } from '@tanstack/react-router'
 import { useEffect, useMemo, useState, type ComponentType, type CSSProperties, type ReactNode } from 'react'
 import { useForm } from 'react-hook-form'
 import { Badge } from '../../components/ui/badge'
@@ -10,7 +10,7 @@ import { Panel, PanelBody, PanelHeader, PanelTitle } from '../../components/ui/p
 import type { CalendarItem } from '../../lib/demo-data'
 import { bookingRequestSchema, type BookingRequestFormValues } from '../../lib/schemas'
 import { dayIndexInTimezone, formatTimeInTimezone } from '../../lib/timezone'
-import { fallbackPublicSlug, fallbackWorkspaceId, usePublicAvailabilityQuery, usePublicBookingMutation, usePublicCalendarItemQuery, usePublicCalendarQuery, usePublicWorkspaceProfileQuery, type CalendarBlockSourceType, type PublicCalendarItemResponse } from '../../lib/api'
+import { usePublicAvailabilityQuery, usePublicBookingMutation, usePublicCalendarItemQuery, usePublicCalendarQuery, usePublicWorkspaceProfileQuery, type CalendarBlockSourceType, type PublicCalendarItemResponse } from '../../lib/api'
 
 const hours = Array.from({ length: 24 }, (_, index) => index)
 const hourHeight = 56
@@ -178,8 +178,7 @@ export function PublicCalendarPage() {
 
 export function PublicCalendarEntryPage() {
   const publicWorkspace = usePublicWorkspaceFromRoute()
-  const pathname = useRouterState({ select: (state) => state.location.pathname })
-  const entryId = pathname.split('/').at(-1)
+  const { entryId } = useParams({ strict: false }) as { entryId?: string }
   const [sourceType, sourceId] = parsePublicEntryId(entryId)
   const entryQuery = usePublicCalendarItemQuery(publicWorkspace.workspaceId, sourceType, sourceId)
   const item = entryQuery.data ? publicApiItemToDetailItem(entryQuery.data, sourceId ?? entryId ?? 'public-entry', publicWorkspace.defaultTimezone, publicWorkspace.displayName) : undefined
@@ -550,22 +549,16 @@ function PublicBlock({ title, startsAt, endsAt, color, onSelect }: { title: stri
 }
 
 function usePublicWorkspaceFromRoute() {
-  const pathname = useRouterState({ select: (state) => state.location.pathname })
-  const publicSlug = publicSlugFromPath(pathname)
+  const { publicSlug } = useParams({ strict: false }) as { publicSlug?: string }
   const profileQuery = usePublicWorkspaceProfileQuery(publicSlug)
-  const displayName = profileQuery.data?.name ?? (publicSlug === 'doni' ? 'Doni' : publicSlug)
+  const displayName = profileQuery.data?.name ?? publicSlug ?? 'Calendary'
   return {
-    publicSlug,
+    publicSlug: publicSlug ?? '',
     displayName,
-    workspaceId: profileQuery.data?.id ?? (fallbackWorkspaceId || undefined),
+    workspaceId: profileQuery.data?.id,
     defaultTimezone: profileQuery.data?.defaultTimezone ?? 'Europe/Paris',
     isProfileLoading: profileQuery.isPending,
   }
-}
-
-function publicSlugFromPath(pathname: string) {
-  const [, section, slug] = pathname.split('/')
-  return section === 'p' && slug ? slug : fallbackPublicSlug
 }
 
 type PublicSelection = {

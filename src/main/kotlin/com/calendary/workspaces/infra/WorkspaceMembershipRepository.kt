@@ -13,4 +13,7 @@ interface WorkspaceMembershipRepository : JpaRepository<WorkspaceMembership, UUI
 
 	@EntityGraph(attributePaths = ["workspace"])
 	fun findByUserIdOrderByCreatedAtAsc(userId: UUID): List<WorkspaceMembership>
+
+	@EntityGraph(attributePaths = ["user"])
+	fun findByWorkspaceIdOrderByCreatedAtAsc(workspaceId: UUID): List<WorkspaceMembership>
 }

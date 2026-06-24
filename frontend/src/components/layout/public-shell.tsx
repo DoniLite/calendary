@@ -1,14 +1,15 @@
-import { Link, Outlet, useRouterState } from '@tanstack/react-router'
+import { Link, Outlet, useParams, useRouterState } from '@tanstack/react-router'
 import { CalendarDays, Clock, LogIn, Mail } from 'lucide-react'
 import { ThemeSwitcher } from '../../features/theme/theme-switcher'
-import { fallbackPublicSlug, usePublicWorkspaceProfileQuery } from '../../lib/api'
+import { usePublicWorkspaceProfileQuery } from '../../lib/api'
 import { cn } from '../../lib/utils'
 
 export function PublicShell() {
   const pathname = useRouterState({ select: (state) => state.location.pathname })
-  const publicSlug = publicSlugFromPath(pathname)
+  const params = useParams({ strict: false }) as { publicSlug?: string }
+  const publicSlug = params.publicSlug ?? ''
   const profileQuery = usePublicWorkspaceProfileQuery(publicSlug)
-  const profileName = profileQuery.data?.name ?? (publicSlug === 'doni' ? 'Doni' : publicSlug)
+  const profileName = profileQuery.data?.name ?? publicSlug ?? 'Calendary'
   const navItems = [
     { to: '/p/$publicSlug/calendar', params: { publicSlug }, href: `/p/${publicSlug}/calendar`, label: 'Calendar', icon: CalendarDays, primary: false },
     { to: '/p/$publicSlug/availability', params: { publicSlug }, href: `/p/${publicSlug}/availability`, label: 'Availability', icon: Clock, primary: false },
@@ -70,9 +71,4 @@ export function PublicShell() {
       </main>
     </div>
   )
-}
-
-function publicSlugFromPath(pathname: string) {
-  const [, section, slug] = pathname.split('/')
-  return section === 'p' && slug ? slug : fallbackPublicSlug
 }

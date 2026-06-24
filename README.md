@@ -163,28 +163,18 @@ bun run dev
 L'interface est disponible sur :
 
 ```text
-http://localhost:5173/p/doni/calendar
+http://localhost:5173/
 ```
+
+La racine `/` (et `/p` sans slug) resout automatiquement le calendrier public du super admin via `GET /public/profiles/default` cote backend, puis redirige vers `/p/<slug-reel>/calendar`. Aucune configuration de slug ou de workspace n'est necessaire cote frontend.
 
 Le flow normal commence par les pages publiques. Utiliser `Login` dans le header public pour acceder a l'application authentifiee.
 
 Le bootstrap du premier super admin est volontairement separe sur `/bootstrap` et demande une confirmation explicite. Ne l'utiliser que pour initialiser un serveur sans compte proprietaire.
 
-Par defaut, le frontend ouvre le slug public `doni`. Le super admin peut ensuite changer le slug public et le fuseau par defaut depuis `Settings > Workspace setup`. Pour changer le slug public par defaut en dev avant que le backend soit seed :
+Une fois connecte, le workspace actif vient de la session (`/api/me/workspaces`). Le super admin peut changer le slug public et le fuseau par defaut depuis `Settings > Workspace setup`.
 
-```bash
-export VITE_CALENDARY_PUBLIC_SLUG=<public-slug>
-bun run dev
-```
-
-Le frontend peut aussi tourner avec des donnees mock pour permettre le travail UI sans seed backend. Une fois connecte, le workspace actif vient de la session. Pour forcer un workspace en dev sans session, renseigner l'id du workspace :
-
-```bash
-export VITE_CALENDARY_WORKSPACE_ID=<workspace-uuid>
-bun run dev
-```
-
-Le proxy Vite envoie `/api`, `/public` et `/ws` vers le backend local `http://localhost:8080`.
+Le proxy Vite envoie `/api`, `/public` et `/ws` vers le backend local `http://localhost:8080`. En production, c'est le serveur Express du frontend qui assure ce proxy vers `CALENDARY_API_BASE_URL` (voir `docker-compose.prod.yml`).
 
 Verifier le frontend :
 

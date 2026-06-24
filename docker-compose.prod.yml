@@ -48,6 +48,7 @@ services:
     image: ghcr.io/${GHCR_OWNER}/calendary-frontend:${IMAGE_TAG:-latest}
     environment:
       PORT: 3000
+      CALENDARY_API_BASE_URL: http://backend:8080
     depends_on:
       - backend
     expose:

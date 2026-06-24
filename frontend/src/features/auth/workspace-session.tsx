@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { createContext, useContext, useEffect, useMemo, useState, type PropsWithChildren } from 'react'
-import { apiGet, fallbackWorkspaceId, type AuthenticatedUserResponse, type WorkspaceResponse } from '../../lib/api'
+import { apiGet, type AuthenticatedUserResponse, type WorkspaceResponse } from '../../lib/api'
 
 type WorkspaceSessionValue = {
   user?: AuthenticatedUserResponse
@@ -21,8 +21,8 @@ const WorkspaceSessionContext = createContext<WorkspaceSessionValue | null>(null
 export function WorkspaceSessionProvider({ children }: PropsWithChildren) {
   const queryClient = useQueryClient()
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState(() => {
-    if (typeof window === 'undefined') return fallbackWorkspaceId
-    return window.localStorage.getItem(activeWorkspaceStorageKey) || fallbackWorkspaceId
+    if (typeof window === 'undefined') return ''
+    return window.localStorage.getItem(activeWorkspaceStorageKey) || ''
   })
 
   const meQuery = useQuery({
@@ -59,7 +59,7 @@ export function WorkspaceSessionProvider({ children }: PropsWithChildren) {
       user: meQuery.data,
       workspaces,
       activeWorkspace,
-      activeWorkspaceId: activeWorkspace?.id ?? fallbackWorkspaceId,
+      activeWorkspaceId: activeWorkspace?.id ?? '',
       apiEnabled: Boolean(activeWorkspace?.id),
       isAuthenticated: Boolean(meQuery.data),
       isLoading: meQuery.isPending || (Boolean(meQuery.data) && workspacesQuery.isPending),
@@ -73,7 +73,7 @@ export function WorkspaceSessionProvider({ children }: PropsWithChildren) {
       clearSession: () => {
         queryClient.removeQueries({ queryKey: ['auth'] })
         queryClient.removeQueries({ queryKey: ['me'] })
-        setSelectedWorkspaceId(fallbackWorkspaceId)
+        setSelectedWorkspaceId('')
       },
     }),
     [activeWorkspace, meQuery.data, meQuery.isPending, queryClient, workspaces, workspacesQuery.isPending],

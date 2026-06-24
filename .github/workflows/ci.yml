@@ -86,8 +86,5 @@ jobs:
           push: true
           tags: ${{ steps.frontend-meta.outputs.tags }}
           labels: ${{ steps.frontend-meta.outputs.labels }}
-          build-args: |
-            VITE_CALENDARY_PUBLIC_SLUG=${{ vars.VITE_CALENDARY_PUBLIC_SLUG }}
-            VITE_CALENDARY_WORKSPACE_ID=${{ vars.VITE_CALENDARY_WORKSPACE_ID }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

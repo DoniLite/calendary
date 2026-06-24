@@ -3,11 +3,12 @@ import { AlertTriangle, KeyRound, Mail, Server, ShieldCheck, UserPlus } from 'lu
 import type { ComponentType, ReactNode } from 'react'
 import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
+import { useTranslation } from 'react-i18next'
 import { Link, useNavigate } from '@tanstack/react-router'
 import { Button } from '../../components/ui/button'
 import { FieldError } from '../../components/ui/form-field'
 import { Panel, PanelBody, PanelHeader, PanelTitle } from '../../components/ui/panel'
-import { apiPatch, apiPost, fallbackPublicSlug, type AuthenticatedUserResponse } from '../../lib/api'
+import { apiPatch, apiPost, type AuthenticatedUserResponse } from '../../lib/api'
 import {
   acceptInvitationSchema,
   bootstrapSchema,
@@ -21,6 +22,7 @@ import {
 import { useWorkspaceSession } from './workspace-session'
 
 export function LoginPage() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const { isAuthenticated, isLoading, refreshSession, user } = useWorkspaceSession()
   const [error, setError] = useState('')
@@ -37,7 +39,7 @@ export function LoginPage() {
       await refreshSession()
       await navigate({ to: nextRouteFor(user) })
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Unable to sign in.')
+      setError(cause instanceof Error ? cause.message : t('auth.login.genericError'))
     }
   }
 
@@ -48,20 +50,20 @@ export function LoginPage() {
   }, [isAuthenticated, isLoading, navigate, user])
 
   return (
-    <AuthFrame title="Sign in" subtitle="Access your Calendary workspace.">
+    <AuthFrame title={t('auth.login.title')} subtitle={t('auth.login.subtitle')}>
       <form className="grid gap-4" onSubmit={handleSubmit(onSubmit)}>
-        <Field icon={Mail} label="Email">
+        <Field icon={Mail} label={t('auth.email')}>
           <input className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" type="email" placeholder="owner@calendary.dev" {...register('email')} />
           <FieldError message={errors.email?.message} />
         </Field>
-        <Field icon={KeyRound} label="Password">
-          <input className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" type="password" placeholder="Password" {...register('password')} />
+        <Field icon={KeyRound} label={t('auth.password')}>
+          <input className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" type="password" placeholder={t('auth.password')} {...register('password')} />
           <FieldError message={errors.password?.message} />
         </Field>
         {error && <p className="rounded-md border border-busy/30 bg-busy/10 px-3 py-2 text-sm">{error}</p>}
-        <Button disabled={isSubmitting}>{isSubmitting ? 'Signing in' : 'Sign in'}</Button>
-        <Link to="/p/$publicSlug/calendar" params={{ publicSlug: fallbackPublicSlug }} className="text-center text-sm text-muted-foreground hover:text-foreground">
-          Back to public calendar
+        <Button disabled={isSubmitting}>{isSubmitting ? t('auth.login.submitting') : t('auth.login.submit')}</Button>
+        <Link to="/" className="text-center text-sm text-muted-foreground hover:text-foreground">
+          {t('auth.login.backToPublicCalendar')}
         </Link>
       </form>
     </AuthFrame>
@@ -69,6 +71,7 @@ export function LoginPage() {
 }
 
 export function BootstrapPage() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const { refreshSession } = useWorkspaceSession()
   const [setupArmed, setSetupArmed] = useState(false)
@@ -90,29 +93,29 @@ export function BootstrapPage() {
       await refreshSession()
       await navigate({ to: nextRouteFor(user) })
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Unable to bootstrap server.')
+      setError(cause instanceof Error ? cause.message : t('auth.bootstrap.genericError'))
     }
   }
 
   if (!setupArmed) {
     return (
-      <AuthFrame title="Server setup" subtitle="This page is only for the first owner account.">
+      <AuthFrame title={t('auth.bootstrap.gateTitle')} subtitle={t('auth.bootstrap.gateSubtitle')}>
         <div className="space-y-4">
           <div className="rounded-md border border-busy/30 bg-busy/10 p-4">
             <div className="flex items-center gap-2 font-medium">
               <AlertTriangle className="h-4 w-4" aria-hidden />
-              Controlled bootstrap
+              {t('auth.bootstrap.controlledBootstrap')}
             </div>
             <p className="mt-2 text-sm text-muted-foreground">
-              Continue only if this is your server and no super admin account exists yet.
+              {t('auth.bootstrap.controlledBootstrapBody')}
             </p>
           </div>
           <Button className="w-full" onClick={() => setSetupArmed(true)}>
-            Start server setup
+            {t('auth.bootstrap.start')}
           </Button>
           <div className="grid gap-2 text-center text-sm">
-            <Link to="/login" className="text-muted-foreground hover:text-foreground">I already have an account</Link>
-            <Link to="/p/$publicSlug/calendar" params={{ publicSlug: fallbackPublicSlug }} className="text-muted-foreground hover:text-foreground">Back to public calendar</Link>
+            <Link to="/login" className="text-muted-foreground hover:text-foreground">{t('auth.bootstrap.alreadyHaveAccount')}</Link>
+            <Link to="/" className="text-muted-foreground hover:text-foreground">{t('auth.bootstrap.backToPublicCalendar')}</Link>
           </div>
         </div>
       </AuthFrame>
@@ -120,28 +123,28 @@ export function BootstrapPage() {
   }
 
   return (
-    <AuthFrame title="Bootstrap server" subtitle="Create the first super admin account.">
+    <AuthFrame title={t('auth.bootstrap.title')} subtitle={t('auth.bootstrap.subtitle')}>
       <form className="grid gap-4" onSubmit={handleSubmit(onSubmit)}>
-        <Field icon={Mail} label="Email">
+        <Field icon={Mail} label={t('auth.email')}>
           <input className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" type="email" placeholder="owner@calendary.dev" {...register('email')} />
           <FieldError message={errors.email?.message} />
         </Field>
-        <Field icon={Server} label="Workspace name">
+        <Field icon={Server} label={t('auth.workspaceName')}>
           <input className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" placeholder="Owner workspace" {...register('workspaceName')} />
           <FieldError message={errors.workspaceName?.message} />
         </Field>
-        <Field icon={KeyRound} label="Password">
+        <Field icon={KeyRound} label={t('auth.password')}>
           <input className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" type="password" {...register('password')} />
           <FieldError message={errors.password?.message} />
         </Field>
-        <Field icon={AlertTriangle} label="Confirmation">
-          <input className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" placeholder="Type CREATE OWNER" {...register('confirmation')} />
+        <Field icon={AlertTriangle} label={t('auth.bootstrap.confirmation')}>
+          <input className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" placeholder={t('auth.bootstrap.confirmationPlaceholder')} {...register('confirmation')} />
           <FieldError message={errors.confirmation?.message} />
         </Field>
         {error && <p className="rounded-md border border-busy/30 bg-busy/10 px-3 py-2 text-sm">{error}</p>}
-        <Button disabled={isSubmitting}>{isSubmitting ? 'Creating' : 'Create super admin'}</Button>
+        <Button disabled={isSubmitting}>{isSubmitting ? t('auth.bootstrap.submitting') : t('auth.bootstrap.submit')}</Button>
         <button type="button" className="text-sm text-muted-foreground hover:text-foreground" onClick={() => setSetupArmed(false)}>
-          Cancel setup
+          {t('auth.bootstrap.cancel')}
         </button>
       </form>
     </AuthFrame>
@@ -149,6 +152,7 @@ export function BootstrapPage() {
 }
 
 export function AcceptInvitationPage() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const { refreshSession } = useWorkspaceSession()
   const [error, setError] = useState('')
@@ -170,33 +174,34 @@ export function AcceptInvitationPage() {
       await refreshSession()
       await navigate({ to: nextRouteFor(authenticatedUser) })
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Unable to accept invitation.')
+      setError(cause instanceof Error ? cause.message : t('auth.acceptInvitation.genericError'))
     }
   }
 
   return (
-    <AuthFrame title="Accept invitation" subtitle="Create your collaborator account and private workspace.">
+    <AuthFrame title={t('auth.acceptInvitation.title')} subtitle={t('auth.acceptInvitation.subtitle')}>
       <form className="grid gap-4" onSubmit={handleSubmit(onSubmit)}>
-        <Field icon={UserPlus} label="Invitation token">
-          <input className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" placeholder="Paste token" {...register('token')} />
+        <Field icon={UserPlus} label={t('auth.acceptInvitation.token')}>
+          <input className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" placeholder={t('auth.acceptInvitation.tokenPlaceholder')} {...register('token')} />
           <FieldError message={errors.token?.message} />
         </Field>
-        <Field icon={Server} label="Workspace name">
+        <Field icon={Server} label={t('auth.workspaceName')}>
           <input className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" placeholder="My workspace" {...register('workspaceName')} />
           <FieldError message={errors.workspaceName?.message} />
         </Field>
-        <Field icon={KeyRound} label="New password">
+        <Field icon={KeyRound} label={t('auth.acceptInvitation.newPassword')}>
           <input className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" type="password" {...register('password')} />
           <FieldError message={errors.password?.message} />
         </Field>
         {error && <p className="rounded-md border border-busy/30 bg-busy/10 px-3 py-2 text-sm">{error}</p>}
-        <Button disabled={isSubmitting}>{isSubmitting ? 'Accepting' : 'Accept invitation'}</Button>
+        <Button disabled={isSubmitting}>{isSubmitting ? t('auth.acceptInvitation.submitting') : t('auth.acceptInvitation.submit')}</Button>
       </form>
     </AuthFrame>
   )
 }
 
 export function ChangePasswordPage() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const { user, refreshSession, isLoading } = useWorkspaceSession()
   const [error, setError] = useState('')
@@ -216,7 +221,7 @@ export function ChangePasswordPage() {
       await refreshSession()
       await navigate({ to: nextRouteFor(updatedUser) })
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Unable to change password.')
+      setError(cause instanceof Error ? cause.message : t('auth.changePassword.genericError'))
     }
   }
 
@@ -227,18 +232,18 @@ export function ChangePasswordPage() {
   }, [isLoading, navigate, user])
 
   return (
-    <AuthFrame title="Change password" subtitle="Set a permanent password before opening your workspace.">
+    <AuthFrame title={t('auth.changePassword.title')} subtitle={t('auth.changePassword.subtitle')}>
       <form className="grid gap-4" onSubmit={handleSubmit(onSubmit)}>
-        <Field icon={ShieldCheck} label="Current password">
+        <Field icon={ShieldCheck} label={t('auth.changePassword.currentPassword')}>
           <input className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" type="password" {...register('currentPassword')} />
           <FieldError message={errors.currentPassword?.message} />
         </Field>
-        <Field icon={KeyRound} label="New password">
+        <Field icon={KeyRound} label={t('auth.changePassword.newPassword')}>
           <input className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" type="password" {...register('newPassword')} />
           <FieldError message={errors.newPassword?.message} />
         </Field>
         {error && <p className="rounded-md border border-busy/30 bg-busy/10 px-3 py-2 text-sm">{error}</p>}
-        <Button disabled={isSubmitting || isLoading}>{isSubmitting ? 'Saving' : 'Save password'}</Button>
+        <Button disabled={isSubmitting || isLoading}>{isSubmitting ? t('auth.changePassword.submitting') : t('auth.changePassword.submit')}</Button>
       </form>
     </AuthFrame>
   )
