@@ -48,7 +48,12 @@ services:
     image: ghcr.io/${GHCR_OWNER}/calendary-frontend:${IMAGE_TAG:-latest}
     environment:
       PORT: 3000
-      CALENDARY_API_BASE_URL: http://backend:8080
+      # Defaults to the Docker-network hostname, which only resolves when both
+      # services run from this same compose stack on the same network. If they're
+      # deployed as separate Coolify applications (each with their own domain),
+      # set CALENDARY_API_BASE_URL to the backend's public URL instead, e.g.
+      # https://calendary-backend.donilite.me
+      CALENDARY_API_BASE_URL: ${CALENDARY_API_BASE_URL:-http://backend:8080}
     depends_on:
       - backend
     expose:
