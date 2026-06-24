@@ -145,6 +145,46 @@ class WorkspaceControllerIntegrationTests(
 
 	@Test
 	@Transactional
+	fun `lists workspace members for assignee and participant pickers`() {
+		val owner = onboarding.bootstrapSuperAdmin(
+			BootstrapSuperAdminCommand(
+				email = "owner@calendary.dev",
+				password = "very-secret-password",
+				workspaceName = "Owner workspace",
+			),
+		)
+		val invitation = onboarding.inviteCollaborator(
+			InviteCollaboratorCommand(
+				email = "collab@calendary.dev",
+				invitedById = owner.id,
+				accessLevel = WorkspaceAccessLevel.READ,
+			),
+		)
+		onboarding.acceptInvitation(
+			AcceptInvitationCommand(
+				rawToken = invitation.rawToken,
+				password = "collab-secret-password",
+				workspaceName = "Collab workspace",
+			),
+		)
+		val session = loginAs("owner@calendary.dev", "very-secret-password")
+		val workspaceId = com.jayway.jsonpath.JsonPath.read<String>(
+			mockMvc.perform(mvcGet("/api/me/workspaces").session(session))
+				.andExpect(status().isOk)
+				.andReturn()
+				.response
+				.contentAsString,
+			"$.items[0].id",
+		)
+
+		mockMvc.perform(mvcGet("/api/workspaces/$workspaceId/members").session(session))
+			.andExpect(status().isOk)
+			.andExpect(jsonPath("$.items.length()").value(2))
+			.andExpect(jsonPath("$.items[*].email").value(org.hamcrest.Matchers.containsInAnyOrder("owner@calendary.dev", "collab@calendary.dev")))
+	}
+
+	@Test
+	@Transactional
 	fun `requires session to list workspaces`() {
 		mockMvc.get("/api/me/workspaces")
 			.andExpect {

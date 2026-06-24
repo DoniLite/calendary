@@ -119,6 +119,29 @@ class PublicCalendarIntegrationTests(
 
 	@Test
 	@Transactional
+	fun `default public profile resolves the super admin workspace without a slug`() {
+		val workspaceId = bootstrapWorkspace()
+
+		mockMvc.get("/public/profiles/default")
+			.andExpect {
+				status { isOk() }
+				jsonPath("$.id") { value(workspaceId.toString()) }
+				jsonPath("$.name") { value("Owner workspace") }
+			}
+	}
+
+	@Test
+	@Transactional
+	fun `default public profile fails when no super admin is configured`() {
+		mockMvc.get("/public/profiles/default")
+			.andExpect {
+				status { isBadRequest() }
+				jsonPath("$.code") { value("bad_request") }
+			}
+	}
+
+	@Test
+	@Transactional
 	fun `rejects booking request on busy slot`() {
 		val workspaceId = bootstrapWorkspace()
 		val session = loginAs("owner@calendary.dev", "very-secret-password")

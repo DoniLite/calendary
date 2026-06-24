@@ -1,0 +1,134 @@
+{
+  "nav": {
+    "calendar": "Calendar",
+    "timeline": "Timeline",
+    "tasks": "Tasks",
+    "projects": "Projects",
+    "booking": "Booking",
+    "inbox": "Inbox",
+    "collaborators": "Collaborators",
+    "settings": "Settings",
+    "requests": "Requests",
+    "search": "Search tasks, events, projects",
+    "workspace": "Workspace",
+    "noWorkspaceSelected": "No workspace selected",
+    "readAccess": "Read",
+    "access": "access",
+    "signOut": "Sign out",
+    "signedOut": "Signed out",
+    "admin": "Admin",
+    "collaborator": "Collaborator",
+    "new": "New",
+    "event": "Event",
+    "task": "Task",
+    "project": "Project",
+    "epic": "Epic"
+  },
+  "collaboratorPortal": {
+    "home": "Home",
+    "sharedCalendar": "Shared calendar",
+    "sharedTasks": "Shared tasks",
+    "projects": "Projects",
+    "requests": "Requests",
+    "title": "Collaborator portal",
+    "subtitle": "Private workspace and shared admin workspace",
+    "workspace": "Workspace",
+    "collaborator": "Collaborator"
+  },
+  "language": {
+    "label": "Language",
+    "en": "English",
+    "fr": "French"
+  },
+  "auth": {
+    "email": "Email",
+    "password": "Password",
+    "workspaceName": "Workspace name",
+    "login": {
+      "title": "Sign in",
+      "subtitle": "Access your Calendary workspace.",
+      "submit": "Sign in",
+      "submitting": "Signing in",
+      "backToPublicCalendar": "Back to public calendar",
+      "genericError": "Unable to sign in."
+    },
+    "bootstrap": {
+      "gateTitle": "Server setup",
+      "gateSubtitle": "This page is only for the first owner account.",
+      "controlledBootstrap": "Controlled bootstrap",
+      "controlledBootstrapBody": "Continue only if this is your server and no super admin account exists yet.",
+      "start": "Start server setup",
+      "alreadyHaveAccount": "I already have an account",
+      "backToPublicCalendar": "Back to public calendar",
+      "title": "Bootstrap server",
+      "subtitle": "Create the first super admin account.",
+      "confirmation": "Confirmation",
+      "confirmationPlaceholder": "Type CREATE OWNER",
+      "submit": "Create super admin",
+      "submitting": "Creating",
+      "cancel": "Cancel setup",
+      "genericError": "Unable to bootstrap server."
+    },
+    "changePassword": {
+      "title": "Change password",
+      "subtitle": "Set a permanent password before opening your workspace.",
+      "currentPassword": "Current password",
+      "newPassword": "New password",
+      "submit": "Save password",
+      "submitting": "Saving",
+      "genericError": "Unable to change password."
+    },
+    "acceptInvitation": {
+      "title": "Accept invitation",
+      "subtitle": "Create your collaborator account and private workspace.",
+      "token": "Invitation token",
+      "tokenPlaceholder": "Paste token",
+      "newPassword": "New password",
+      "submit": "Accept invitation",
+      "submitting": "Accepting",
+      "genericError": "Unable to accept invitation."
+    }
+  },
+  "settings": {
+    "title": "Settings",
+    "subtitle": "Runtime configuration for email, storage and conferencing.",
+    "smtp": "SMTP email",
+    "backblaze": "Backblaze B2",
+    "googleMeet": "Google Meet",
+    "publicBaseUrl": "Public base URL",
+    "configuredByEnvironment": "Configured by environment",
+    "configuredByBackendEnvironment": "Configured by backend environment.",
+    "workspaceSetup": {
+      "title": "Workspace setup",
+      "name": "Workspace name",
+      "publicSlug": "Public slug",
+      "defaultTimezone": "Default timezone",
+      "publicUrl": "Public URL",
+      "save": "Save workspace",
+      "saving": "Saving",
+      "saved": "Workspace settings saved.",
+      "error": "Unable to save workspace settings."
+    },
+    "collaborators": {
+      "title": "Collaborators",
+      "email": "Email",
+      "access": "Access",
+      "read": "Read",
+      "write": "Write",
+      "expires": "Expires",
+      "invite": "Invite",
+      "inviting": "Inviting",
+      "genericError": "Unable to create invitation.",
+      "createdFor": "Invitation created for {{email}}"
+    }
+  },
+  "common": {
+    "loading": "Loading...",
+    "save": "Save",
+    "cancel": "Cancel",
+    "create": "Create",
+    "edit": "Edit",
+    "delete": "Delete",
+    "back": "Back"
+  }
+}

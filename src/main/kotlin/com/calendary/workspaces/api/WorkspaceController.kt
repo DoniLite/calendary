@@ -10,8 +10,13 @@ import com.calendary.workspaces.api.dto.toPublicProfileResponse
 import com.calendary.workspaces.api.dto.toResponse
 import com.calendary.workspaces.application.WorkspaceAccessService
 import com.calendary.workspaces.domain.WorkspaceAccessLevel
+import com.calendary.workspaces.domain.WorkspaceType
 import com.calendary.workspaces.infra.WorkspaceMembershipRepository
 import com.calendary.workspaces.infra.WorkspaceRepository
+import com.calendary.users.api.dto.MemberListResponse
+import com.calendary.users.api.dto.toSummary
+import com.calendary.users.domain.UserRole
+import com.calendary.users.infra.UserAccountRepository
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.validation.Valid
 import java.util.UUID
@@ -39,6 +44,15 @@ class WorkspaceController(
 	@GetMapping("/workspaces")
 	fun workspaces(request: HttpServletRequest): WorkspaceListResponse = myWorkspaces(request)
 
+	@GetMapping("/workspaces/{workspaceId}/members")
+	fun members(@PathVariable workspaceId: UUID, request: HttpServletRequest): MemberListResponse {
+		val currentUser = sessions.currentUser(request.getSession(false))
+		workspaceAccess.requireRead(workspaceId, currentUser.id)
+		return MemberListResponse(
+			items = memberships.findByWorkspaceIdOrderByCreatedAtAsc(workspaceId).mapNotNull { it.user?.toSummary() },
+		)
+	}
+
 	@PatchMapping("/workspaces/{workspaceId}/settings")
 	fun updateSettings(
 		@PathVariable workspaceId: UUID,
@@ -64,7 +78,17 @@ class WorkspaceController(
 @RequestMapping("/public/profiles")
 class PublicWorkspaceProfileController(
 	private val workspaces: WorkspaceRepository,
+	private val users: UserAccountRepository,
 ) {
+	@GetMapping("/default")
+	fun defaultProfile(): PublicWorkspaceProfileResponse {
+		val superAdmin = users.findByRole(UserRole.SUPER_ADMIN)
+			.orElseThrow { IllegalArgumentException("No super admin is configured yet.") }
+		return workspaces.findFirstByOwnerIdAndType(superAdmin.id, WorkspaceType.PERSONAL)
+			.orElseThrow { IllegalArgumentException("Super admin workspace not found.") }
+			.toPublicProfileResponse()
+	}
+
 	@GetMapping("/{publicSlug}")
 	fun profile(@PathVariable publicSlug: String): PublicWorkspaceProfileResponse =
 		workspaces.findByPublicSlugIgnoreCase(publicSlug)

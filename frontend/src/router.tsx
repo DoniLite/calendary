@@ -29,7 +29,7 @@ import { SettingsView } from './features/settings/settings-view'
 import { useWorkspaceSession } from './features/auth/workspace-session'
 import { InboxView } from './features/inbox/inbox-view'
 import { CollaboratorsView } from './features/collaborators/collaborators-view'
-import { fallbackPublicSlug } from './lib/api'
+import { fetchDefaultPublicProfile } from './lib/api'
 
 const rootRoute = createRootRoute({
   component: () => <Outlet />,
@@ -38,8 +38,12 @@ const rootRoute = createRootRoute({
 const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/',
-  beforeLoad: () => {
-    throw redirect({ to: '/p/$publicSlug/calendar', params: { publicSlug: fallbackPublicSlug } })
+  beforeLoad: async () => {
+    const profile = await fetchDefaultPublicProfile().catch(() => undefined)
+    if (!profile) {
+      throw redirect({ to: '/login' })
+    }
+    throw redirect({ to: '/p/$publicSlug/calendar', params: { publicSlug: profile.publicSlug } })
   },
 })
 
@@ -265,6 +269,18 @@ const publicRoute = createRoute({
   component: PublicShell,
 })
 
+const publicIndexRoute = createRoute({
+  getParentRoute: () => publicRoute,
+  path: '/',
+  beforeLoad: async () => {
+    const profile = await fetchDefaultPublicProfile().catch(() => undefined)
+    if (!profile) {
+      throw redirect({ to: '/login' })
+    }
+    throw redirect({ to: '/p/$publicSlug/calendar', params: { publicSlug: profile.publicSlug } })
+  },
+})
+
 const publicSlugRoute = createRoute({
   getParentRoute: () => publicRoute,
   path: '/$publicSlug',
@@ -434,7 +450,7 @@ const routeTree = rootRoute.addChildren([
     eventDetailRoute,
     eventEditRoute,
   ]),
-  publicRoute.addChildren([publicSlugRoute, publicCalendarRoute, publicCalendarEntryRoute, publicAvailabilityRoute, publicRequestRoute]),
+  publicRoute.addChildren([publicIndexRoute, publicSlugRoute, publicCalendarRoute, publicCalendarEntryRoute, publicAvailabilityRoute, publicRequestRoute]),
   collaboratorRoute.addChildren([
     collaboratorIndexRoute,
     collaboratorCalendarRoute,

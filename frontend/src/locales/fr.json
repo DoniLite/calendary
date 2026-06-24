@@ -1,0 +1,134 @@
+{
+  "nav": {
+    "calendar": "Calendrier",
+    "timeline": "Frise",
+    "tasks": "Tâches",
+    "projects": "Projets",
+    "booking": "Réservations",
+    "inbox": "Boîte de réception",
+    "collaborators": "Collaborateurs",
+    "settings": "Paramètres",
+    "requests": "Demandes",
+    "search": "Rechercher des tâches, événements, projets",
+    "workspace": "Espace de travail",
+    "noWorkspaceSelected": "Aucun espace de travail sélectionné",
+    "readAccess": "Lecture",
+    "access": "accès",
+    "signOut": "Se déconnecter",
+    "signedOut": "Déconnecté",
+    "admin": "Admin",
+    "collaborator": "Collaborateur",
+    "new": "Nouveau",
+    "event": "Événement",
+    "task": "Tâche",
+    "project": "Projet",
+    "epic": "Epic"
+  },
+  "collaboratorPortal": {
+    "home": "Accueil",
+    "sharedCalendar": "Calendrier partagé",
+    "sharedTasks": "Tâches partagées",
+    "projects": "Projets",
+    "requests": "Demandes",
+    "title": "Portail collaborateur",
+    "subtitle": "Espace de travail privé et espace de travail admin partagé",
+    "workspace": "Espace de travail",
+    "collaborator": "Collaborateur"
+  },
+  "language": {
+    "label": "Langue",
+    "en": "Anglais",
+    "fr": "Français"
+  },
+  "auth": {
+    "email": "Email",
+    "password": "Mot de passe",
+    "workspaceName": "Nom de l'espace de travail",
+    "login": {
+      "title": "Connexion",
+      "subtitle": "Accédez à votre espace de travail Calendary.",
+      "submit": "Se connecter",
+      "submitting": "Connexion en cours",
+      "backToPublicCalendar": "Retour au calendrier public",
+      "genericError": "Connexion impossible."
+    },
+    "bootstrap": {
+      "gateTitle": "Configuration du serveur",
+      "gateSubtitle": "Cette page est réservée à la création du premier compte propriétaire.",
+      "controlledBootstrap": "Configuration contrôlée",
+      "controlledBootstrapBody": "Continuez uniquement si c'est votre serveur et qu'aucun compte super admin n'existe encore.",
+      "start": "Démarrer la configuration du serveur",
+      "alreadyHaveAccount": "J'ai déjà un compte",
+      "backToPublicCalendar": "Retour au calendrier public",
+      "title": "Configuration du serveur",
+      "subtitle": "Créez le premier compte super admin.",
+      "confirmation": "Confirmation",
+      "confirmationPlaceholder": "Tapez CREATE OWNER",
+      "submit": "Créer le super admin",
+      "submitting": "Création en cours",
+      "cancel": "Annuler la configuration",
+      "genericError": "Configuration du serveur impossible."
+    },
+    "changePassword": {
+      "title": "Changer le mot de passe",
+      "subtitle": "Définissez un mot de passe permanent avant d'ouvrir votre espace de travail.",
+      "currentPassword": "Mot de passe actuel",
+      "newPassword": "Nouveau mot de passe",
+      "submit": "Enregistrer le mot de passe",
+      "submitting": "Enregistrement",
+      "genericError": "Changement de mot de passe impossible."
+    },
+    "acceptInvitation": {
+      "title": "Accepter l'invitation",
+      "subtitle": "Créez votre compte collaborateur et votre espace de travail privé.",
+      "token": "Jeton d'invitation",
+      "tokenPlaceholder": "Collez le jeton",
+      "newPassword": "Nouveau mot de passe",
+      "submit": "Accepter l'invitation",
+      "submitting": "Acceptation en cours",
+      "genericError": "Impossible d'accepter l'invitation."
+    }
+  },
+  "settings": {
+    "title": "Paramètres",
+    "subtitle": "Configuration des emails, du stockage et de la visioconférence.",
+    "smtp": "Email SMTP",
+    "backblaze": "Backblaze B2",
+    "googleMeet": "Google Meet",
+    "publicBaseUrl": "URL publique de base",
+    "configuredByEnvironment": "Configuré par l'environnement",
+    "configuredByBackendEnvironment": "Configuré par l'environnement du backend.",
+    "workspaceSetup": {
+      "title": "Configuration de l'espace de travail",
+      "name": "Nom de l'espace de travail",
+      "publicSlug": "Slug public",
+      "defaultTimezone": "Fuseau horaire par défaut",
+      "publicUrl": "URL publique",
+      "save": "Enregistrer l'espace de travail",
+      "saving": "Enregistrement",
+      "saved": "Paramètres de l'espace de travail enregistrés.",
+      "error": "Impossible d'enregistrer les paramètres de l'espace de travail."
+    },
+    "collaborators": {
+      "title": "Collaborateurs",
+      "email": "Email",
+      "access": "Accès",
+      "read": "Lecture",
+      "write": "Écriture",
+      "expires": "Expiration",
+      "invite": "Inviter",
+      "inviting": "Invitation en cours",
+      "genericError": "Impossible de créer l'invitation.",
+      "createdFor": "Invitation créée pour {{email}}"
+    }
+  },
+  "common": {
+    "loading": "Chargement...",
+    "save": "Enregistrer",
+    "cancel": "Annuler",
+    "create": "Créer",
+    "edit": "Modifier",
+    "delete": "Supprimer",
+    "back": "Retour"
+  }
+}

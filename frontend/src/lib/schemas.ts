@@ -59,10 +59,7 @@ export const resourceFormSchema = z.object({
   visibility: z.enum(['PRIVATE', 'PUBLIC']),
   startsAt: z.string().min(1, 'Start time is required'),
   endsAt: z.string().min(1, 'End time is required'),
-  project: z.string(),
-  epic: z.string(),
   priority: z.string(),
-  assigneeEmails: z.string(),
 })
 export type ResourceFormValues = z.infer<typeof resourceFormSchema>
 

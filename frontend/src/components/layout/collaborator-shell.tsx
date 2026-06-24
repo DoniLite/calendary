@@ -1,20 +1,23 @@
 import { Link, Outlet, useNavigate, useRouterState } from '@tanstack/react-router'
 import { CalendarDays, CheckCheck, CheckSquare2, Inbox, KanbanSquare, Layers3, LogOut, Plus } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { Button } from '../ui/button'
 import { useWorkspaceSession } from '../../features/auth/workspace-session'
+import { LanguageSwitcher } from '../../features/theme/language-switcher'
 import { ThemeSwitcher } from '../../features/theme/theme-switcher'
 import { apiLogout } from '../../lib/api'
 import { cn } from '../../lib/utils'
 
 const navItems = [
-  { to: '/collab', label: 'Home', icon: Inbox },
-  { to: '/collab/calendar', label: 'Shared calendar', icon: CalendarDays },
-  { to: '/collab/tasks', label: 'Shared tasks', icon: KanbanSquare },
-  { to: '/collab/projects', label: 'Projects', icon: Layers3 },
-  { to: '/collab/requests', label: 'Requests', icon: CheckCheck },
-]
+  { to: '/collab', labelKey: 'collaboratorPortal.home', icon: Inbox },
+  { to: '/collab/calendar', labelKey: 'collaboratorPortal.sharedCalendar', icon: CalendarDays },
+  { to: '/collab/tasks', labelKey: 'collaboratorPortal.sharedTasks', icon: KanbanSquare },
+  { to: '/collab/projects', labelKey: 'collaboratorPortal.projects', icon: Layers3 },
+  { to: '/collab/requests', labelKey: 'collaboratorPortal.requests', icon: CheckCheck },
+] as const
 
 export function CollaboratorShell() {
+  const { t } = useTranslation()
   const pathname = useRouterState({ select: (state) => state.location.pathname })
   const navigate = useNavigate()
   const { activeWorkspace, activeWorkspaceId, setActiveWorkspaceId, workspaces, user, clearSession } = useWorkspaceSession()
@@ -34,13 +37,13 @@ export function CollaboratorShell() {
             <div className="flex items-center gap-3">
               <img src="/avatar.jpeg" alt="Doni" className="h-10 w-10 rounded-md border object-cover" />
               <div className="min-w-0">
-                <div className="truncate text-sm font-semibold">{user?.email ?? 'Collaborator'}</div>
-                <div className="text-xs text-muted-foreground">Collaborator portal</div>
+                <div className="truncate text-sm font-semibold">{user?.email ?? t('collaboratorPortal.collaborator')}</div>
+                <div className="text-xs text-muted-foreground">{t('collaboratorPortal.title')}</div>
               </div>
             </div>
             {workspaces.length > 1 && (
               <label className="mt-3 grid gap-2">
-                <span className="text-xs font-medium text-muted-foreground">Workspace</span>
+                <span className="text-xs font-medium text-muted-foreground">{t('collaboratorPortal.workspace')}</span>
                 <select
                   className="h-10 rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
                   value={activeWorkspaceId}
@@ -69,13 +72,14 @@ export function CollaboratorShell() {
                   )}
                 >
                   <Icon className="h-4 w-4" aria-hidden />
-                  {item.label}
+                  {t(item.labelKey)}
                 </Link>
               )
             })}
           </nav>
-          <div className="mt-auto">
+          <div className="mt-auto space-y-3">
             <ThemeSwitcher />
+            <LanguageSwitcher />
           </div>
         </div>
       </aside>
@@ -83,13 +87,13 @@ export function CollaboratorShell() {
         <header className="border-b bg-background px-4 py-4 lg:px-6">
           <div className="flex items-center justify-between gap-4">
             <div>
-              <div className="text-lg font-semibold">Collaborator portal</div>
-              <div className="text-sm text-muted-foreground">Private workspace and shared admin workspace</div>
+              <div className="text-lg font-semibold">{t('collaboratorPortal.title')}</div>
+              <div className="text-sm text-muted-foreground">{t('collaboratorPortal.subtitle')}</div>
             </div>
             <div className="flex items-center gap-2">
               {canWrite && <NewResourceMenu />}
               <img src="/avatar.jpeg" alt="Doni" className="h-9 w-9 rounded-md border object-cover" />
-              <Button variant="ghost" onClick={() => void handleLogout()} aria-label="Sign out">
+              <Button variant="ghost" onClick={() => void handleLogout()} aria-label={t('nav.signOut')}>
                 <LogOut className="h-4 w-4" aria-hidden />
               </Button>
             </div>
@@ -104,17 +108,18 @@ export function CollaboratorShell() {
 }
 
 function NewResourceMenu() {
+  const { t } = useTranslation()
   return (
     <details className="group relative">
       <summary className="inline-flex h-9 cursor-pointer list-none items-center justify-center gap-2 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
         <Plus className="h-4 w-4" aria-hidden />
-        New
+        {t('nav.new')}
       </summary>
       <div className="absolute right-0 top-11 z-30 w-56 rounded-lg border bg-card p-2 shadow-panel">
-        <NewResourceLink to="/collab/events/new" icon={CalendarDays} label="Event" />
-        <NewResourceLink to="/collab/tasks/new" icon={CheckSquare2} label="Task" />
-        <NewResourceLink to="/collab/projects/new" icon={Layers3} label="Project" />
-        <NewResourceLink to="/collab/epics/new" icon={KanbanSquare} label="Epic" />
+        <NewResourceLink to="/collab/events/new" icon={CalendarDays} label={t('nav.event')} />
+        <NewResourceLink to="/collab/tasks/new" icon={CheckSquare2} label={t('nav.task')} />
+        <NewResourceLink to="/collab/projects/new" icon={Layers3} label={t('nav.project')} />
+        <NewResourceLink to="/collab/epics/new" icon={KanbanSquare} label={t('nav.epic')} />
       </div>
     </details>
   )

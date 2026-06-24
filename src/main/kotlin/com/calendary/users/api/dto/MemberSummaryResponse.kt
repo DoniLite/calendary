@@ -8,4 +8,8 @@ data class MemberSummaryResponse(
 	val email: String,
 )
 
+data class MemberListResponse(
+	val items: List<MemberSummaryResponse>,
+)
+
 fun UserAccount.toSummary(): MemberSummaryResponse = MemberSummaryResponse(id = id, email = email)
