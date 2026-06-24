@@ -295,47 +295,125 @@ export function PublicCalendarEntryPage() {
 export function PublicAvailabilityPage() {
   const publicWorkspace = usePublicWorkspaceFromRoute()
   const [timezone, setTimezone] = useState(publicWorkspace.defaultTimezone)
-  const start = useMemo(() => startOfWeek(new Date()), [])
-  const availabilityQuery = usePublicAvailabilityQuery(publicWorkspace.workspaceId, start, addDays(start, 7))
-  const slots = availabilityQuery.data?.slots.map((slot, index) => ({
-    id: `slot-${index}`,
-    label: formatSlotLabel(slot.startsAt, timezone),
-    startsAt: slot.startsAt,
-    endsAt: slot.endsAt,
-    available: slot.available,
-  })) ?? []
+  const [weekOffset, setWeekOffset] = useState(0)
+  const [selectedDayKey, setSelectedDayKey] = useState<string>()
+  const weekStart = useMemo(() => addDays(startOfWeek(new Date()), weekOffset * 7), [weekOffset])
+  const days = useMemo(() => weekDays(weekStart), [weekStart])
+  const availabilityQuery = usePublicAvailabilityQuery(publicWorkspace.workspaceId, weekStart, addDays(weekStart, 7))
+  const slots = useMemo(
+    () =>
+      availabilityQuery.data?.slots.map((slot, index) => ({
+        id: `slot-${index}`,
+        label: formatSlotLabel(slot.startsAt, timezone),
+        dayKey: formatDayKey(new Date(slot.startsAt), timezone),
+        startsAt: slot.startsAt,
+        endsAt: slot.endsAt,
+        available: slot.available,
+      })) ?? [],
+    [availabilityQuery.data, timezone],
+  )
+  const slotsByDay = useMemo(() => {
+    const map = new Map<string, typeof slots>()
+    for (const slot of slots) {
+      const bucket = map.get(slot.dayKey)
+      if (bucket) bucket.push(slot)
+      else map.set(slot.dayKey, [slot])
+    }
+    return map
+  }, [slots])
+  const dayOptions = useMemo(
+    () =>
+      days.map((day) => {
+        const dayKey = formatDayKey(day, timezone)
+        const daySlots = slotsByDay.get(dayKey) ?? []
+        return {
+          dayKey,
+          label: formatDayLabel(day, timezone),
+          availableCount: daySlots.filter((slot) => slot.available).length,
+        }
+      }),
+    [days, timezone, slotsByDay],
+  )
+  const firstAvailableDayKey = dayOptions.find((day) => day.availableCount > 0)?.dayKey
+  const activeDayKey = (selectedDayKey && dayOptions.some((day) => day.dayKey === selectedDayKey)) ? selectedDayKey : (firstAvailableDayKey ?? dayOptions[0]?.dayKey)
+  const visibleSlots = activeDayKey ? slotsByDay.get(activeDayKey) ?? [] : []
   const [selectedSlot, setSelectedSlot] = useState<string>()
   useEffect(() => {
     setTimezone(publicWorkspace.defaultTimezone)
   }, [publicWorkspace.defaultTimezone])
   useEffect(() => {
-    if (selectedSlot || !slots.length) return
-    setSelectedSlot(slots.find((slot) => slot.available)?.id ?? slots[0]?.id)
-  }, [slots, selectedSlot])
+    setSelectedDayKey(undefined)
+    setSelectedSlot(undefined)
+  }, [weekOffset])
+  useEffect(() => {
+    if (selectedSlot && visibleSlots.some((slot) => slot.id === selectedSlot)) return
+    setSelectedSlot(visibleSlots.find((slot) => slot.available)?.id ?? visibleSlots[0]?.id)
+  }, [visibleSlots, selectedSlot])
   return (
     <div className="space-y-5">
-      <div>
-        <h1 className="text-3xl font-semibold">Availability</h1>
-        <p className="mt-2 text-sm text-muted-foreground">Choose a free slot before sending a request.</p>
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <h1 className="text-3xl font-semibold">Availability</h1>
+          <p className="mt-2 text-sm text-muted-foreground">Pick a day, then choose a free slot before sending a request.</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <label className="flex h-9 items-center gap-2 rounded-md border bg-card px-3 text-sm">
+            <Globe2 className="h-4 w-4 text-muted-foreground" aria-hidden />
+            <select className="bg-transparent outline-none" value={timezone} onChange={(event) => setTimezone(event.target.value)}>
+              {timezones.map((value) => (
+                <option key={value} value={value}>{value}</option>
+              ))}
+            </select>
+          </label>
+          <Button variant="secondary" aria-label="Previous week" onClick={() => setWeekOffset((value) => value - 1)}>
+            <ChevronLeft className="h-4 w-4" aria-hidden />
+          </Button>
+          <Button variant="secondary" onClick={() => setWeekOffset(0)}>This week</Button>
+          <Button variant="secondary" aria-label="Next week" onClick={() => setWeekOffset((value) => value + 1)}>
+            <ChevronRight className="h-4 w-4" aria-hidden />
+          </Button>
+        </div>
       </div>
-      <label className="inline-flex h-9 items-center gap-2 rounded-md border bg-card px-3 text-sm">
-        <Globe2 className="h-4 w-4 text-muted-foreground" aria-hidden />
-        <select className="bg-transparent outline-none" value={timezone} onChange={(event) => setTimezone(event.target.value)}>
-          {timezones.map((value) => (
-            <option key={value} value={value}>{value}</option>
+
+      <Panel className="overflow-hidden">
+        <div className="border-b bg-muted px-4 py-3 text-sm text-muted-foreground">
+          Browse days to find a precise time. Displayed in <span className="font-medium text-foreground">{timezone}</span>
+          {availabilityQuery.isFetching && <span> · Syncing availability</span>}
+        </div>
+        <PanelBody className="flex flex-wrap gap-2">
+          {dayOptions.map((day) => (
+            <button
+              key={day.dayKey}
+              className={
+                activeDayKey === day.dayKey
+                  ? 'rounded-md border border-primary bg-primary/10 px-3 py-2 text-left text-sm ring-2 ring-primary/20'
+                  : day.availableCount > 0
+                    ? 'rounded-md border bg-card px-3 py-2 text-left text-sm hover:border-primary/60'
+                    : 'cursor-not-allowed rounded-md border bg-muted px-3 py-2 text-left text-sm opacity-60'
+              }
+              onClick={() => setSelectedDayKey(day.dayKey)}
+            >
+              <div className="font-semibold">{day.label}</div>
+              <div className="mt-1 text-xs text-muted-foreground">
+                {day.availableCount > 0 ? `${day.availableCount} free` : 'No slots'}
+              </div>
+            </button>
           ))}
-        </select>
-      </label>
+        </PanelBody>
+      </Panel>
+
       <Panel>
         <PanelHeader>
-          <PanelTitle>Available slots</PanelTitle>
+          <PanelTitle>Available slots {activeDayKey ? `· ${dayOptions.find((day) => day.dayKey === activeDayKey)?.label}` : ''}</PanelTitle>
         </PanelHeader>
         <PanelBody className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {availabilityQuery.isPending && <div className="rounded-md border bg-muted/40 px-4 py-3 text-sm text-muted-foreground sm:col-span-2 xl:col-span-3">Loading availability...</div>}
-          {!availabilityQuery.isPending && !slots.length && (
-            <div className="rounded-md border bg-muted/40 px-4 py-3 text-sm text-muted-foreground sm:col-span-2 xl:col-span-3">No slots available this week.</div>
+          {!availabilityQuery.isPending && !visibleSlots.length && (
+            <div className="rounded-md border bg-muted/40 px-4 py-3 text-sm text-muted-foreground sm:col-span-2 xl:col-span-3">
+              No slots available on this day. Use the day picker or week navigation above to try another day.
+            </div>
           )}
-          {slots.map((slot) => (
+          {visibleSlots.map((slot) => (
             <button
               key={slot.id}
               className={
@@ -629,6 +707,10 @@ function weekDays(start: Date) {
 
 function formatDayLabel(date: Date, timezone: string) {
   return new Intl.DateTimeFormat(undefined, { weekday: 'short', day: '2-digit', month: 'short', timeZone: timezone }).format(date)
+}
+
+function formatDayKey(date: Date, timezone: string) {
+  return new Intl.DateTimeFormat('en-CA', { year: 'numeric', month: '2-digit', day: '2-digit', timeZone: timezone }).format(date)
 }
 
 function formatSlotLabel(value: string, timezone: string) {

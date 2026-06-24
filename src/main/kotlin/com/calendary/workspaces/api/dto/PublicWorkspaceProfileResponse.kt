@@ -8,6 +8,8 @@ data class PublicWorkspaceProfileResponse(
 	val name: String,
 	val publicSlug: String,
 	val defaultTimezone: String,
+	val theme: String,
+	val hasCustomIcon: Boolean,
 )
 
 fun Workspace.toPublicProfileResponse(): PublicWorkspaceProfileResponse =
@@ -16,4 +18,6 @@ fun Workspace.toPublicProfileResponse(): PublicWorkspaceProfileResponse =
 		name = name,
 		publicSlug = publicSlug,
 		defaultTimezone = defaultTimezone,
+		theme = theme,
+		hasCustomIcon = iconStorageKey != null,
 	)

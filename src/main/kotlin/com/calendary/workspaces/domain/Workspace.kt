@@ -23,6 +23,12 @@ open class Workspace(
 	@Column(name = "default_timezone", nullable = false)
 	open var defaultTimezone: String = "Europe/Paris",
 
+	@Column(nullable = false)
+	open var theme: String = "solar-orange",
+
+	@Column(name = "icon_storage_key")
+	open var iconStorageKey: String? = null,
+
 	@Enumerated(EnumType.STRING)
 	@Column(nullable = false)
 	open var type: WorkspaceType = WorkspaceType.PERSONAL,

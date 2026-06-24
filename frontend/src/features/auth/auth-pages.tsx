@@ -8,7 +8,8 @@ import { Link, useNavigate } from '@tanstack/react-router'
 import { Button } from '../../components/ui/button'
 import { FieldError } from '../../components/ui/form-field'
 import { Panel, PanelBody, PanelHeader, PanelTitle } from '../../components/ui/panel'
-import { apiPatch, apiPost, type AuthenticatedUserResponse } from '../../lib/api'
+import { apiPatch, apiPost, fetchDefaultPublicProfile, publicWorkspaceIconUrl, type AuthenticatedUserResponse } from '../../lib/api'
+import { useQuery } from '@tanstack/react-query'
 import {
   acceptInvitationSchema,
   bootstrapSchema,
@@ -255,12 +256,21 @@ function nextRouteFor(user: AuthenticatedUserResponse): '/change-password' | '/c
 }
 
 function AuthFrame({ title, subtitle, children }: { title: string; subtitle: string; children: ReactNode }) {
+  // Anonymous visitors land here before any session exists, so the only branding available
+  // is whatever the default (super admin) workspace has published publicly.
+  const profileQuery = useQuery({
+    queryKey: ['public-profile', 'default'],
+    queryFn: fetchDefaultPublicProfile,
+    retry: false,
+  })
+  const iconUrl = publicWorkspaceIconUrl(profileQuery.data?.publicSlug, profileQuery.data?.hasCustomIcon)
+
   return (
     <div className="grid min-h-screen place-items-center bg-background px-4">
       <Panel className="w-full max-w-md">
         <PanelHeader>
           <div className="flex items-center gap-3">
-            <img src="/avatar.jpeg" alt="Calendary" className="h-11 w-11 rounded-md border object-cover" />
+            <img src={iconUrl} alt="Calendary" className="h-11 w-11 rounded-md border object-cover" />
             <div>
               <PanelTitle>{title}</PanelTitle>
               <p className="text-sm text-muted-foreground">{subtitle}</p>

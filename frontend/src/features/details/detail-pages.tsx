@@ -128,13 +128,17 @@ function useResourceDraftQuery(kind: ResourceKind, workspaceId: string | undefin
   const eventQuery = useEventQuery(workspaceId, kind === 'EVENT' ? resourceId : undefined)
   const taskQuery = useTaskQuery(workspaceId, kind === 'TASK' ? resourceId : undefined)
   const projectQuery = useProjectQuery(workspaceId, kind === 'PROJECT' || kind === 'EPIC' ? resourceId : undefined)
-  const draft = kind === 'EVENT' && eventQuery.data
-    ? draftFromEvent(eventQuery.data)
-    : kind === 'TASK' && taskQuery.data
-      ? draftFromTask(taskQuery.data)
-      : (kind === 'PROJECT' || kind === 'EPIC') && projectQuery.data
-        ? draftFromProject(projectQuery.data)
-        : undefined
+  // draftFromX() always returns a brand-new object, so it must be memoized on the underlying
+  // query data (which TanStack Query keeps referentially stable across renders). Recomputing
+  // this inline on every render gave consumers (the effect in ResourceEditor below) a "new"
+  // draft every time, which re-triggered reset()/setState() every render — an infinite
+  // "Maximum update depth exceeded" loop that crashed every edit page (Task, Event, Project, Epic).
+  const draft = useMemo(() => {
+    if (kind === 'EVENT' && eventQuery.data) return draftFromEvent(eventQuery.data)
+    if (kind === 'TASK' && taskQuery.data) return draftFromTask(taskQuery.data)
+    if ((kind === 'PROJECT' || kind === 'EPIC') && projectQuery.data) return draftFromProject(projectQuery.data)
+    return undefined
+  }, [kind, eventQuery.data, taskQuery.data, projectQuery.data])
   const members: MemberSummaryResponse[] = kind === 'TASK' ? taskQuery.data?.assignees ?? [] : kind === 'EVENT' ? eventQuery.data?.participants ?? [] : []
   const activeQuery = kind === 'EVENT' ? eventQuery : kind === 'TASK' ? taskQuery : projectQuery
   return {
@@ -204,7 +208,7 @@ function ResourceDetail({ kind }: { kind: ResourceKind }) {
                 <div className="grid gap-3 text-sm sm:grid-cols-2">
                   <DetailRow label="Workspace" value={activeWorkspace?.name ?? 'Workspace'} />
                   <DetailRow label="Access" value={activeWorkspace?.accessLevel ?? 'READ'} />
-                  {(kind === 'EVENT' || kind === 'TASK') && <DetailRow label="Time" value={`${draft.startsAt} - ${draft.endsAt}`} />}
+                  {(kind === 'EVENT' || kind === 'TASK') && <DetailRow label="Time" value={`${formatDisplayDateTime(draft.startsAt)} → ${formatDisplayDateTime(draft.endsAt)}`} />}
                   {projectTitle && <DetailRow label="Project" value={projectTitle} />}
                   {epicTitle && <DetailRow label="Epic" value={epicTitle} />}
                 </div>
@@ -607,14 +611,14 @@ function ResourceEditor({ kind, mode }: { kind: ResourceKind; mode: EditorMode }
                   <Field label="Starts at">
                     <input
                       className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
-                      type="time"
+                      type="datetime-local"
                       {...register('startsAt')}
                     />
                   </Field>
                   <Field label="Ends at">
                     <input
                       className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
-                      type="time"
+                      type="datetime-local"
                       {...register('endsAt')}
                     />
                   </Field>
@@ -798,8 +802,8 @@ function createInitialDraft(kind: ResourceKind): ResourceDraft {
     title: `Untitled ${resourceMeta[kind].label.toLowerCase()}`,
     status: statusOptionsFor(kind)[0],
     visibility: 'PRIVATE',
-    startsAt: '09:00',
-    endsAt: '10:00',
+    startsAt: tomorrowAt(9),
+    endsAt: tomorrowAt(10),
     projectId: null,
     epicId: null,
     parentTaskId: null,
@@ -818,8 +822,8 @@ function draftFromEvent(event: EventResponse): ResourceDraft {
     title: event.title,
     status: event.status,
     visibility: event.visibility,
-    startsAt: formatTimeInput(event.startsAt),
-    endsAt: formatTimeInput(event.endsAt),
+    startsAt: formatDateTimeInput(event.startsAt),
+    endsAt: formatDateTimeInput(event.endsAt),
     projectId: null,
     epicId: null,
     parentTaskId: null,
@@ -835,8 +839,8 @@ function draftFromTask(task: TaskResponse): ResourceDraft {
     title: task.title,
     status: task.status,
     visibility: task.visibility,
-    startsAt: '09:00',
-    endsAt: '10:00',
+    startsAt: task.plannedStart ? formatDateTimeInput(task.plannedStart) : tomorrowAt(9),
+    endsAt: task.plannedEnd ? formatDateTimeInput(task.plannedEnd) : tomorrowAt(10),
     projectId: task.projectId,
     epicId: task.epicId,
     parentTaskId: task.parentTaskId,
@@ -852,8 +856,8 @@ function draftFromProject(project: ProjectResponse): ResourceDraft {
     title: project.title,
     status: project.status,
     visibility: project.visibility,
-    startsAt: project.startsAt ? formatTimeInput(project.startsAt) : '09:00',
-    endsAt: project.dueAt ? formatTimeInput(project.dueAt) : '10:00',
+    startsAt: project.startsAt ? formatDateTimeInput(project.startsAt) : tomorrowAt(9),
+    endsAt: project.dueAt ? formatDateTimeInput(project.dueAt) : tomorrowAt(10),
     projectId: project.parentProjectId,
     epicId: null,
     parentTaskId: null,
@@ -883,8 +887,23 @@ function formatBytes(value: number) {
   return `${(value / 1024 / 1024).toFixed(1)} MB`
 }
 
-function formatTimeInput(value: string) {
-  return new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(value))
+// Formats an ISO instant as a `datetime-local` input value (`YYYY-MM-DDTHH:mm`) in the
+// browser's local timezone — the format `<input type="datetime-local">` requires.
+function formatDateTimeInput(value: string) {
+  const date = new Date(value)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
+
+function tomorrowAt(hour: number) {
+  const date = new Date()
+  date.setDate(date.getDate() + 1)
+  date.setHours(hour, 0, 0, 0)
+  return formatDateTimeInput(date.toISOString())
+}
+
+function formatDisplayDateTime(datetimeLocal: string) {
+  return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(datetimeLocal))
 }
 
 function statusOptionsFor(kind: ResourceKind) {
@@ -974,9 +993,6 @@ function isColorPreset(value: string): value is CalendarColorPreset {
   return ['ORANGE', 'BLUE', 'GREEN', 'ROSE', 'VIOLET', 'SLATE', 'AMBER'].includes(value)
 }
 
-function toInstant(time: string) {
-  const [hours = '0', minutes = '0'] = time.split(':')
-  const date = new Date()
-  date.setHours(Number(hours), Number(minutes), 0, 0)
-  return date.toISOString()
+function toInstant(datetimeLocal: string) {
+  return new Date(datetimeLocal).toISOString()
 }

@@ -192,124 +192,241 @@ textarea {
   }
 }
 
-@layer components {
-  .calendary-mdx-editor {
-    --basePageBg: hsl(var(--background));
-    --baseBase: hsl(var(--card));
-    --baseBgSubtle: hsl(var(--muted) / 0.55);
-    --baseBg: hsl(var(--muted));
-    --baseBgHover: hsl(var(--muted) / 0.8);
-    --baseBgActive: hsl(var(--secondary));
-    --baseLine: hsl(var(--border));
-    --baseBorder: hsl(var(--border));
-    --baseBorderHover: hsl(var(--ring));
-    --baseSolid: hsl(var(--muted-foreground));
-    --baseSolidHover: hsl(var(--foreground));
-    --baseText: hsl(var(--muted-foreground));
-    --baseTextContrast: hsl(var(--foreground));
-    --accentBase: hsl(var(--primary) / 0.08);
-    --accentBgSubtle: hsl(var(--primary) / 0.1);
-    --accentBg: hsl(var(--primary) / 0.16);
-    --accentBgHover: hsl(var(--primary) / 0.22);
-    --accentBgActive: hsl(var(--primary) / 0.28);
-    --accentLine: hsl(var(--primary) / 0.35);
-    --accentBorder: hsl(var(--primary) / 0.45);
-    --accentBorderHover: hsl(var(--primary));
-    --accentSolid: hsl(var(--primary));
-    --accentSolidHover: hsl(var(--primary) / 0.9);
-    --accentText: hsl(var(--primary));
-    --accentTextContrast: hsl(var(--primary-foreground));
-    --font-body: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
-    overflow: hidden;
-    min-height: 460px;
-    border: 1px solid hsl(var(--border));
-    border-radius: var(--radius);
-    background: hsl(var(--background));
-  }
+/*
+ * NOTE: these MDXEditor overrides are intentionally NOT inside a Tailwind
+ * `@layer` (e.g. `@layer components`). Per the CSS cascade-layers spec,
+ * *any* unlayered style always beats styles declared in a named layer,
+ * regardless of selector specificity. `@mdxeditor/editor/style.css` (and
+ * the CodeMirror theme it injects at runtime) ships as plain, unlayered
+ * CSS with its own hardcoded light-mode colors. If these rules lived in
+ * `@layer components` they would silently lose to MDXEditor's defaults
+ * in every theme - which is exactly what was happening before this fix
+ * (confirmed via computed styles: `--baseText` resolved to MDXEditor's
+ * own `#60646c`, not our `hsl(var(--foreground))`). Keeping this block
+ * unlayered lets normal specificity/source-order rules decide instead.
+ */
+.calendary-mdx-editor {
+  overflow: hidden;
+  min-height: 460px;
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius);
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+}
 
-  .calendary-mdx-editor .mdxeditor {
-    min-height: 460px;
-    background: hsl(var(--background));
-    color: hsl(var(--foreground));
-  }
+/*
+ * The custom properties below are declared directly on `.mdxeditor`
+ * (MDXEditor's own root element, which also carries its hashed
+ * `_editorRoot_*` class) rather than on the outer `.calendary-mdx-editor`
+ * wrapper. MDXEditor's own stylesheet re-declares `--basePageBg`,
+ * `--baseBg`, `--baseText`, etc. directly on that same root element
+ * (`._editorRoot_* { --basePageBg: white; ... }`). Custom properties
+ * resolve from the nearest declaring ancestor, so declaring them only on
+ * the outer wrapper let MDXEditor's closer declaration win for anything
+ * rendered inside the editor root (e.g. the codeblock language-select
+ * popover, which stayed hardcoded white-on-white text in dark themes).
+ * Declaring them here too, on the same element, lets normal selector
+ * specificity decide instead: `.calendary-mdx-editor .mdxeditor` (0,2,0)
+ * beats `._editorRoot_*` (0,1,0).
+ */
+.calendary-mdx-editor .mdxeditor {
+  --basePageBg: hsl(var(--background));
+  --baseBase: hsl(var(--card));
+  --baseBgSubtle: hsl(var(--muted) / 0.55);
+  --baseBg: hsl(var(--secondary));
+  --baseBgHover: hsl(var(--secondary) / 0.8);
+  --baseBgActive: hsl(var(--secondary));
+  --baseLine: hsl(var(--border));
+  --baseBorder: hsl(var(--border));
+  --baseBorderHover: hsl(var(--ring));
+  --baseSolid: hsl(var(--muted-foreground));
+  --baseSolidHover: hsl(var(--foreground));
+  --baseText: hsl(var(--foreground));
+  --baseTextContrast: hsl(var(--foreground));
+  --accentBase: hsl(var(--primary) / 0.08);
+  --accentBgSubtle: hsl(var(--primary) / 0.1);
+  --accentBg: hsl(var(--primary) / 0.16);
+  --accentBgHover: hsl(var(--primary) / 0.22);
+  --accentBgActive: hsl(var(--primary) / 0.28);
+  --accentLine: hsl(var(--primary) / 0.35);
+  --accentBorder: hsl(var(--primary) / 0.45);
+  --accentBorderHover: hsl(var(--primary));
+  --accentSolid: hsl(var(--primary));
+  --accentSolidHover: hsl(var(--primary) / 0.9);
+  --accentText: hsl(var(--primary));
+  --accentTextContrast: hsl(var(--primary-foreground));
+  --font-body: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  min-height: 460px;
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+}
 
-  .calendary-mdx-editor [role="toolbar"] {
-    top: 0;
-    gap: 0.25rem;
-    border-bottom: 1px solid hsl(var(--border));
-    border-radius: 0;
-    background: hsl(var(--card));
-    color: hsl(var(--foreground));
-  }
+.calendary-mdx-editor [role="toolbar"] {
+  top: 0;
+  gap: 0.25rem;
+  border-bottom: 1px solid hsl(var(--border));
+  border-radius: 0;
+  background: hsl(var(--card));
+  color: hsl(var(--foreground));
+}
 
-  .calendary-mdx-editor [role="toolbar"] button,
-  .calendary-mdx-editor [role="toolbar"] [role="combobox"] {
-    min-height: 2rem;
-    border-radius: calc(var(--radius) - 2px);
-  }
+.calendary-mdx-editor [role="toolbar"] button,
+.calendary-mdx-editor [role="toolbar"] [role="combobox"] {
+  min-height: 2rem;
+  border-radius: calc(var(--radius) - 2px);
+  color: hsl(var(--foreground));
+}
 
-  .calendary-mdx-editor [role="toolbar"] button:focus-visible,
-  .calendary-mdx-editor [role="toolbar"] [role="combobox"]:focus-visible {
-    outline: 2px solid hsl(var(--ring));
-    outline-offset: 2px;
-  }
+.calendary-mdx-editor [role="toolbar"] svg {
+  color: currentColor;
+  fill: currentColor;
+}
 
-  .calendary-mdx-editor-content {
-    min-height: 390px;
-    padding: 1.25rem;
-    font-size: 0.95rem;
-    line-height: 1.75;
-  }
+.calendary-mdx-editor [role="toolbar"] button:disabled,
+.calendary-mdx-editor [role="toolbar"] button[data-disabled="true"],
+.calendary-mdx-editor [role="toolbar"] button[aria-disabled="true"] {
+  color: hsl(var(--muted-foreground));
+  opacity: 0.6;
+}
 
-  .calendary-mdx-editor-content h1 {
-    margin: 0 0 1rem;
-    font-size: 1.55rem;
-    font-weight: 700;
-    line-height: 1.25;
-  }
+.calendary-mdx-editor [role="toolbar"] button:hover,
+.calendary-mdx-editor [role="toolbar"] [role="combobox"]:hover {
+  background: hsl(var(--muted));
+}
 
-  .calendary-mdx-editor-content h2 {
-    margin: 1.25rem 0 0.65rem;
-    font-size: 1.2rem;
-    font-weight: 650;
-    line-height: 1.3;
-  }
+.calendary-mdx-editor [role="toolbar"] button[data-state="on"],
+.calendary-mdx-editor [role="toolbar"] button[aria-pressed="true"] {
+  background: hsl(var(--primary) / 0.16);
+  color: hsl(var(--primary));
+}
 
-  .calendary-mdx-editor-content h3 {
-    margin: 1rem 0 0.5rem;
-    font-size: 1rem;
-    font-weight: 650;
-  }
+.calendary-mdx-editor [role="toolbar"] button:focus-visible,
+.calendary-mdx-editor [role="toolbar"] [role="combobox"]:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+}
 
-  .calendary-mdx-editor-content p {
-    margin: 0.55rem 0;
-  }
+.calendary-mdx-editor-content {
+  min-height: 390px;
+  padding: 1.25rem;
+  font-size: 0.95rem;
+  line-height: 1.75;
+  color: hsl(var(--foreground));
+}
 
-  .calendary-mdx-editor-content ul,
-  .calendary-mdx-editor-content ol {
-    margin: 0.65rem 0;
-    padding-left: 1.35rem;
-  }
+.calendary-mdx-editor-content h1,
+.calendary-mdx-editor-content h2,
+.calendary-mdx-editor-content h3,
+.calendary-mdx-editor-content p,
+.calendary-mdx-editor-content li,
+.calendary-mdx-editor-content td,
+.calendary-mdx-editor-content th {
+  color: hsl(var(--foreground));
+}
 
-  .calendary-mdx-editor-content blockquote {
-    margin: 1rem 0;
-    border-left: 3px solid hsl(var(--primary));
-    padding: 0.3rem 0 0.3rem 0.9rem;
-    color: hsl(var(--muted-foreground));
-  }
+.calendary-mdx-editor-content h1 {
+  margin: 0 0 1rem;
+  font-size: 1.55rem;
+  font-weight: 700;
+  line-height: 1.25;
+}
 
-  .calendary-mdx-editor-content code {
-    border-radius: 0.35rem;
-    background: hsl(var(--muted));
-    padding: 0.12rem 0.3rem;
-    font-size: 0.86em;
-  }
+.calendary-mdx-editor-content h2 {
+  margin: 1.25rem 0 0.65rem;
+  font-size: 1.2rem;
+  font-weight: 650;
+  line-height: 1.3;
+}
 
-  .calendary-mdx-editor-content pre {
-    overflow-x: auto;
-    border-radius: var(--radius);
-    background: hsl(var(--muted));
-    padding: 0.85rem;
-  }
+.calendary-mdx-editor-content h3 {
+  margin: 1rem 0 0.5rem;
+  font-size: 1rem;
+  font-weight: 650;
+}
+
+.calendary-mdx-editor-content p {
+  margin: 0.55rem 0;
+}
+
+.calendary-mdx-editor-content ul,
+.calendary-mdx-editor-content ol {
+  margin: 0.65rem 0;
+  padding-left: 1.35rem;
+}
+
+.calendary-mdx-editor-content a {
+  color: hsl(var(--primary));
+}
+
+.calendary-mdx-editor-content blockquote {
+  margin: 1rem 0;
+  border-left: 3px solid hsl(var(--primary));
+  padding: 0.3rem 0 0.3rem 0.9rem;
+  color: hsl(var(--foreground) / 0.8);
+}
+
+.calendary-mdx-editor-content code {
+  border-radius: 0.35rem;
+  background: hsl(var(--secondary));
+  color: hsl(var(--foreground));
+  padding: 0.12rem 0.3rem;
+  font-size: 0.86em;
+}
+
+.calendary-mdx-editor-content pre {
+  overflow-x: auto;
+  border-radius: var(--radius);
+  background: hsl(var(--secondary));
+  color: hsl(var(--foreground));
+  padding: 0.85rem;
+}
+
+.calendary-mdx-editor-content table {
+  border-color: hsl(var(--border));
+}
+
+.calendary-mdx-editor-content th,
+.calendary-mdx-editor-content td {
+  border-color: hsl(var(--border));
+}
+
+/*
+ * The codeblock plugin renders a CodeMirror instance that loads its own
+ * `cm6-theme-basic-light` theme unconditionally (see
+ * @mdxeditor/editor/dist/plugins/codemirror/CodeMirrorEditor.js). That
+ * theme is injected by CodeMirror as its own unlayered <style> tag at
+ * runtime - after our stylesheet - with light-mode colors hardcoded
+ * (white background, dark text) no matter which app theme is active.
+ * `!important` is needed here because CodeMirror's injected rules can
+ * land later in source order at equal specificity.
+ */
+.calendary-mdx-editor .cm-editor {
+  background: hsl(var(--secondary)) !important;
+  color: hsl(var(--foreground)) !important;
+}
+
+.calendary-mdx-editor .cm-content,
+.calendary-mdx-editor .cm-line {
+  color: hsl(var(--foreground)) !important;
+}
+
+.calendary-mdx-editor .cm-gutters {
+  background: hsl(var(--secondary)) !important;
+  color: hsl(var(--muted-foreground)) !important;
+  border: none !important;
+}
+
+.calendary-mdx-editor .cm-activeLine,
+.calendary-mdx-editor .cm-activeLineGutter {
+  background: hsl(var(--muted) / 0.6) !important;
+}
+
+.calendary-mdx-editor .cm-selectionBackground,
+.calendary-mdx-editor .cm-content ::selection {
+  background: hsl(var(--primary) / 0.25) !important;
+}
+
+.calendary-mdx-editor .cm-cursor {
+  border-left-color: hsl(var(--foreground)) !important;
 }

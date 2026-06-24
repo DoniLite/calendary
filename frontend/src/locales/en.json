@@ -91,13 +91,7 @@
   },
   "settings": {
     "title": "Settings",
-    "subtitle": "Runtime configuration for email, storage and conferencing.",
-    "smtp": "SMTP email",
-    "backblaze": "Backblaze B2",
-    "googleMeet": "Google Meet",
-    "publicBaseUrl": "Public base URL",
-    "configuredByEnvironment": "Configured by environment",
-    "configuredByBackendEnvironment": "Configured by backend environment.",
+    "subtitle": "Workspace identity, branding and access.",
     "workspaceSetup": {
       "title": "Workspace setup",
       "name": "Workspace name",
@@ -108,6 +102,18 @@
       "saving": "Saving",
       "saved": "Workspace settings saved.",
       "error": "Unable to save workspace settings."
+    },
+    "icon": {
+      "title": "Workspace icon",
+      "description": "Shown in the navigation, login page and your public booking page.",
+      "upload": "Upload icon",
+      "uploading": "Uploading...",
+      "error": "Unable to upload workspace icon."
+    },
+    "theme": {
+      "title": "Theme",
+      "description": "Saved to your workspace, so it follows you across browsers.",
+      "error": "Unable to save theme."
     },
     "collaborators": {
       "title": "Collaborators",
@@ -130,5 +136,14 @@
     "edit": "Edit",
     "delete": "Delete",
     "back": "Back"
+  },
+  "search": {
+    "paletteTitle": "Command palette",
+    "paletteDescription": "Search and jump to tasks, projects and events.",
+    "placeholder": "Search tasks, projects, events...",
+    "empty": "No results found.",
+    "tasks": "Tasks",
+    "projects": "Projects",
+    "events": "Events"
   }
 }
