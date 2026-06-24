@@ -105,6 +105,7 @@ class OnboardingService(
 				resourceId = invitation.id,
 			),
 		)
+		val acceptUrl = "${mailProperties.publicBaseUrl}/accept-invitation?token=$rawToken"
 		mail.send(
 			SendMailCommand(
 				to = email,
@@ -113,8 +114,10 @@ class OnboardingService(
 					You have been invited to Calendary.
 
 					Accept your invitation:
-					${mailProperties.publicBaseUrl}/invitations/accept?token=$rawToken
+					$acceptUrl
 				""".trimIndent(),
+				actionLabel = "Accept invitation",
+				actionUrl = acceptUrl,
 			),
 		)
 

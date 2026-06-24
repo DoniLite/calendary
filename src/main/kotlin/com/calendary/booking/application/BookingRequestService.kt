@@ -11,6 +11,7 @@ import com.calendary.events.application.CreateEventCommand
 import com.calendary.events.application.EventService
 import com.calendary.mail.application.MailService
 import com.calendary.mail.application.SendMailCommand
+import com.calendary.mail.config.MailProperties
 import com.calendary.notifications.application.CreateNotificationCommand
 import com.calendary.notifications.application.NotificationService
 import com.calendary.notifications.domain.NotificationType
@@ -29,6 +30,7 @@ class BookingRequestService(
 	private val events: EventService,
 	private val mail: MailService,
 	private val conferences: ConferenceService,
+	private val mailProperties: MailProperties,
 ) {
 	@Transactional
 	fun create(command: CreateBookingRequestCommand): BookingRequest {
@@ -74,6 +76,8 @@ class BookingRequestService(
 				to = owner.email,
 				subject = "New Calendary booking request",
 				body = "${bookingRequest.requesterName} requested a meeting from ${bookingRequest.startsAt} to ${bookingRequest.endsAt}.",
+				actionLabel = "Review request",
+				actionUrl = "${mailProperties.publicBaseUrl}/app/booking",
 			),
 		)
 
@@ -131,6 +135,8 @@ class BookingRequestService(
 				to = bookingRequest.requesterEmail,
 				subject = "Your Calendary booking request was accepted",
 				body = buildAcceptedMailBody(bookingRequest),
+				actionLabel = bookingRequest.conferenceUrl?.let { "Join Google Meet" },
+				actionUrl = bookingRequest.conferenceUrl,
 			),
 		)
 		return bookingRequest
