@@ -88,3 +88,13 @@ jobs:
           labels: ${{ steps.frontend-meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  deploy:
+    needs: [publish]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Coolify deploy
+        run: |
+          curl --fail --silent --show-error -X GET \
+            "${{ secrets.COOLIFY_BASE_URL }}/api/v1/deploy?uuid=${{ secrets.COOLIFY_APP_UUID }}&force=true" \
+            -H "Authorization: Bearer ${{ secrets.COOLIFY_API_TOKEN }}"
