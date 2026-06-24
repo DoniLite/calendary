@@ -1,11 +1,13 @@
 import { Link, Outlet, useNavigate, useRouterState } from '@tanstack/react-router'
-import { CalendarDays, CheckCheck, CheckSquare2, Inbox, KanbanSquare, Layers3, LogOut, Plus } from 'lucide-react'
+import { CalendarDays, CheckCheck, CheckSquare2, Inbox, KanbanSquare, Layers3, LogOut, Plus, Search } from 'lucide-react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '../ui/button'
 import { useWorkspaceSession } from '../../features/auth/workspace-session'
 import { LanguageSwitcher } from '../../features/theme/language-switcher'
 import { ThemeSwitcher } from '../../features/theme/theme-switcher'
-import { apiLogout } from '../../lib/api'
+import { CommandPalette } from '../../features/search/command-palette'
+import { apiLogout, workspaceIconUrl } from '../../lib/api'
 import { cn } from '../../lib/utils'
 
 const navItems = [
@@ -22,6 +24,8 @@ export function CollaboratorShell() {
   const navigate = useNavigate()
   const { activeWorkspace, activeWorkspaceId, setActiveWorkspaceId, workspaces, user, clearSession } = useWorkspaceSession()
   const canWrite = activeWorkspace?.accessLevel !== 'READ'
+  const iconUrl = workspaceIconUrl(activeWorkspace?.id, activeWorkspace?.hasCustomIcon)
+  const [paletteOpen, setPaletteOpen] = useState(false)
 
   async function handleLogout() {
     await apiLogout().catch(() => undefined)
@@ -35,7 +39,7 @@ export function CollaboratorShell() {
         <div className="flex h-full flex-col gap-5">
           <div className="rounded-lg border bg-background p-3">
             <div className="flex items-center gap-3">
-              <img src="/avatar.jpeg" alt="Doni" className="h-10 w-10 rounded-md border object-cover" />
+              <img src={iconUrl} alt={activeWorkspace?.name ?? 'Calendary'} className="h-10 w-10 rounded-md border object-cover" />
               <div className="min-w-0">
                 <div className="truncate text-sm font-semibold">{user?.email ?? t('collaboratorPortal.collaborator')}</div>
                 <div className="text-xs text-muted-foreground">{t('collaboratorPortal.title')}</div>
@@ -91,8 +95,11 @@ export function CollaboratorShell() {
               <div className="text-sm text-muted-foreground">{t('collaboratorPortal.subtitle')}</div>
             </div>
             <div className="flex items-center gap-2">
+              <Button variant="secondary" onClick={() => setPaletteOpen(true)} aria-label={t('nav.search')}>
+                <Search className="h-4 w-4" aria-hidden />
+              </Button>
               {canWrite && <NewResourceMenu />}
-              <img src="/avatar.jpeg" alt="Doni" className="h-9 w-9 rounded-md border object-cover" />
+              <img src={iconUrl} alt={activeWorkspace?.name ?? 'Calendary'} className="h-9 w-9 rounded-md border object-cover" />
               <Button variant="ghost" onClick={() => void handleLogout()} aria-label={t('nav.signOut')}>
                 <LogOut className="h-4 w-4" aria-hidden />
               </Button>
@@ -103,6 +110,7 @@ export function CollaboratorShell() {
           <Outlet />
         </main>
       </div>
+      <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} basePath="/collab" />
     </div>
   )
 }

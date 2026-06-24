@@ -1,12 +1,14 @@
 import { Link, useNavigate, useRouterState } from '@tanstack/react-router'
 import { Bell, CalendarDays, CheckSquare2, Clock3, Inbox, KanbanSquare, Layers3, LogOut, Plus, Search, Settings, Users } from 'lucide-react'
 import type { PropsWithChildren } from 'react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from './ui/button'
 import { LanguageSwitcher } from '../features/theme/language-switcher'
 import { ThemeSwitcher } from '../features/theme/theme-switcher'
+import { CommandPalette } from '../features/search/command-palette'
 import { useWorkspaceSession } from '../features/auth/workspace-session'
-import { apiLogout, useNotificationsQuery } from '../lib/api'
+import { apiLogout, useNotificationsQuery, workspaceIconUrl } from '../lib/api'
 import { cn } from '../lib/utils'
 
 const navItems = [
@@ -27,6 +29,8 @@ export function AppShell({ children }: PropsWithChildren) {
   const { activeWorkspace, apiEnabled, clearSession, user } = useWorkspaceSession()
   const canWrite = activeWorkspace?.accessLevel !== 'READ'
   const notificationsQuery = useNotificationsQuery(apiEnabled)
+  const iconUrl = workspaceIconUrl(activeWorkspace?.id, activeWorkspace?.hasCustomIcon)
+  const [paletteOpen, setPaletteOpen] = useState(false)
 
   async function handleLogout() {
     await apiLogout().catch(() => undefined)
@@ -40,7 +44,7 @@ export function AppShell({ children }: PropsWithChildren) {
         <div className="flex h-full flex-col gap-5">
           <div className="px-2">
             <div className="flex items-center gap-3">
-              <img src="/avatar.jpeg" alt="Doni" className="h-10 w-10 rounded-md border object-cover" />
+              <img src={iconUrl} alt={activeWorkspace?.name ?? 'Calendary'} className="h-10 w-10 rounded-md border object-cover" />
               <div className="min-w-0">
                 <div className="text-xl font-semibold leading-7">Calendary</div>
                 <div className="truncate text-sm text-muted-foreground">Doni time server</div>
@@ -87,13 +91,15 @@ export function AppShell({ children }: PropsWithChildren) {
         <header className="sticky top-0 z-20 border-b bg-background/95 backdrop-blur">
           <div className="flex min-h-16 items-center gap-3 px-4 lg:px-6">
             <div className="min-w-0 flex-1">
-              <div className="flex max-w-md items-center gap-2 rounded-md border bg-card px-3 py-2">
-                <Search className="h-4 w-4 text-muted-foreground" aria-hidden />
-                <input
-                  className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-                  placeholder={t('nav.search')}
-                />
-              </div>
+              <button
+                type="button"
+                onClick={() => setPaletteOpen(true)}
+                className="flex h-10 w-full max-w-md items-center gap-2 rounded-md border bg-card px-3 text-left text-sm text-muted-foreground hover:bg-muted"
+              >
+                <Search className="h-4 w-4" aria-hidden />
+                <span className="flex-1 truncate">{t('nav.search')}</span>
+                <kbd className="hidden rounded border bg-muted px-1.5 py-0.5 text-xs font-medium sm:inline-block">⌘K</kbd>
+              </button>
             </div>
             <Button variant="secondary" className="hidden sm:inline-flex" onClick={() => void navigate({ to: '/app/inbox' })}>
               <Bell className="h-4 w-4" aria-hidden />
@@ -103,7 +109,7 @@ export function AppShell({ children }: PropsWithChildren) {
               <div className="truncate font-medium">{user?.email ?? t('nav.signedOut')}</div>
               <div className="text-muted-foreground">{user?.role === 'SUPER_ADMIN' ? t('nav.admin') : t('nav.collaborator')}</div>
             </div>
-            <img src="/avatar.jpeg" alt="Doni" className="hidden h-9 w-9 rounded-md border object-cover sm:block" />
+            <img src={iconUrl} alt={activeWorkspace?.name ?? 'Calendary'} className="hidden h-9 w-9 rounded-md border object-cover sm:block" />
             <Button variant="ghost" onClick={() => void handleLogout()} aria-label={t('nav.signOut')}>
               <LogOut className="h-4 w-4" aria-hidden />
             </Button>
@@ -133,6 +139,7 @@ export function AppShell({ children }: PropsWithChildren) {
 
         <main className="px-4 py-5 lg:px-6">{children}</main>
       </div>
+      <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
     </div>
   )
 }

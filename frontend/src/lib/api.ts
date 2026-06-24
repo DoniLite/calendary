@@ -28,6 +28,8 @@ export type WorkspaceResponse = {
   name: string
   publicSlug: string
   defaultTimezone: string
+  theme: string
+  hasCustomIcon: boolean
   type: 'PERSONAL'
   accessLevel: WorkspaceAccessLevel
   ownerId: string
@@ -42,12 +44,18 @@ export type PublicWorkspaceProfileResponse = {
   name: string
   publicSlug: string
   defaultTimezone: string
+  theme: string
+  hasCustomIcon: boolean
 }
 
 export type UpdateWorkspaceSettingsPayload = {
   name: string
   publicSlug: string
   defaultTimezone: string
+}
+
+export type UpdateWorkspaceThemePayload = {
+  theme: string
 }
 
 export type LoginPayload = {
@@ -366,7 +374,7 @@ declare global {
 // backend's own public origin (server.ts injects it into `window.__API_BASE_URL__`) — the
 // backend has CORS configured for the frontend's origin. In dev, that global is empty and
 // requests stay relative, resolved by vite.config.ts's dev proxy instead.
-function resolveUrl(path: string): string {
+export function resolveUrl(path: string): string {
   if (typeof window !== 'undefined') {
     const base = window.__API_BASE_URL__
     return base ? `${base}${path}` : path
@@ -685,6 +693,50 @@ export function useWorkspaceSettingsMutation(workspaceId?: string) {
       void queryClient.invalidateQueries({ queryKey: ['public-profile', workspace.publicSlug] })
     },
   })
+}
+
+export function useWorkspaceThemeMutation(workspaceId?: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (payload: UpdateWorkspaceThemePayload) => {
+      if (!workspaceId) throw new Error('No active workspace selected.')
+      return apiPatch<WorkspaceResponse>(`/api/workspaces/${workspaceId}/theme`, payload)
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['me', 'workspaces'] })
+    },
+  })
+}
+
+export function useWorkspaceIconMutation(workspaceId?: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (file: File) => {
+      if (!workspaceId) throw new Error('No active workspace selected.')
+      const formData = new FormData()
+      formData.append('file', file)
+      return apiPostForm<WorkspaceResponse>(`/api/workspaces/${workspaceId}/icon`, formData)
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['me', 'workspaces'] })
+    },
+  })
+}
+
+/** Resolves the URL an `<img>` should point at for a workspace's icon, falling back to the static default. */
+export function workspaceIconUrl(workspaceId?: string, hasCustomIcon?: boolean): string {
+  if (workspaceId && hasCustomIcon) {
+    return resolveUrl(`/api/workspaces/${workspaceId}/icon`)
+  }
+  return '/avatar.jpeg'
+}
+
+/** Same as {@link workspaceIconUrl} but for anonymous visitors on a public workspace profile. */
+export function publicWorkspaceIconUrl(publicSlug?: string, hasCustomIcon?: boolean): string {
+  if (publicSlug && hasCustomIcon) {
+    return resolveUrl(`/public/profiles/${publicSlug}/icon`)
+  }
+  return '/avatar.jpeg'
 }
 
 function withoutEventStatus(payload: UpsertEventPayload) {

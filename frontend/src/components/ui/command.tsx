@@ -1,6 +1,7 @@
+import * as DialogPrimitive from '@radix-ui/react-dialog'
 import { Command as CommandPrimitive } from 'cmdk'
 import { Search } from 'lucide-react'
-import type { ComponentProps } from 'react'
+import type { ComponentProps, ReactNode } from 'react'
 import { cn } from '../../lib/utils'
 
 export function Command({ className, ...props }: ComponentProps<typeof CommandPrimitive>) {
@@ -10,6 +11,40 @@ export function Command({ className, ...props }: ComponentProps<typeof CommandPr
       className={cn('flex h-full w-full flex-col overflow-hidden rounded-md bg-card text-foreground', className)}
       {...props}
     />
+  )
+}
+
+export function CommandDialog({
+  open,
+  onOpenChange,
+  title = 'Command palette',
+  description = 'Search and jump to anything.',
+  children,
+  className,
+}: {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  title?: string
+  description?: string
+  children: ReactNode
+  className?: string
+}) {
+  return (
+    <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
+      <DialogPrimitive.Portal>
+        <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/50" />
+        <DialogPrimitive.Content
+          className={cn(
+            'fixed left-1/2 top-24 z-50 w-full max-w-lg -translate-x-1/2 overflow-hidden rounded-lg border bg-card shadow-panel',
+            className,
+          )}
+        >
+          <DialogPrimitive.Title className="sr-only">{title}</DialogPrimitive.Title>
+          <DialogPrimitive.Description className="sr-only">{description}</DialogPrimitive.Description>
+          <Command shouldFilter>{children}</Command>
+        </DialogPrimitive.Content>
+      </DialogPrimitive.Portal>
+    </DialogPrimitive.Root>
   )
 }
 
