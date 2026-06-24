@@ -16,6 +16,10 @@ services:
 
   backend:
     image: ghcr.io/${GHCR_OWNER}/calendary-backend:${IMAGE_TAG:-latest}
+    # Without this, `docker compose up -d` reuses whatever image is already cached locally
+    # under the `latest` tag instead of checking GHCR for a newer one — deployments silently
+    # keep running stale code even though CI pushed a fresh image.
+    pull_policy: always
     environment:
       CALENDARY_DATABASE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-calendary}
       CALENDARY_DATABASE_USERNAME: ${POSTGRES_USER:-calendary}
@@ -50,6 +54,7 @@ services:
 
   frontend:
     image: ghcr.io/${GHCR_OWNER}/calendary-frontend:${IMAGE_TAG:-latest}
+    pull_policy: always
     environment:
       PORT: 3000
       # The browser calls this URL directly (no server-side proxy), so it must be the
