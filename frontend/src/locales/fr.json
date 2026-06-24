@@ -91,13 +91,7 @@
   },
   "settings": {
     "title": "Paramètres",
-    "subtitle": "Configuration des emails, du stockage et de la visioconférence.",
-    "smtp": "Email SMTP",
-    "backblaze": "Backblaze B2",
-    "googleMeet": "Google Meet",
-    "publicBaseUrl": "URL publique de base",
-    "configuredByEnvironment": "Configuré par l'environnement",
-    "configuredByBackendEnvironment": "Configuré par l'environnement du backend.",
+    "subtitle": "Identité de l'espace de travail, image de marque et accès.",
     "workspaceSetup": {
       "title": "Configuration de l'espace de travail",
       "name": "Nom de l'espace de travail",
@@ -108,6 +102,18 @@
       "saving": "Enregistrement",
       "saved": "Paramètres de l'espace de travail enregistrés.",
       "error": "Impossible d'enregistrer les paramètres de l'espace de travail."
+    },
+    "icon": {
+      "title": "Icône de l'espace de travail",
+      "description": "Affichée dans la navigation, la page de connexion et votre page de réservation publique.",
+      "upload": "Téléverser une icône",
+      "uploading": "Téléversement...",
+      "error": "Impossible de téléverser l'icône de l'espace de travail."
+    },
+    "theme": {
+      "title": "Thème",
+      "description": "Enregistré sur votre espace de travail, il vous suit donc sur tous les navigateurs.",
+      "error": "Impossible d'enregistrer le thème."
     },
     "collaborators": {
       "title": "Collaborateurs",
@@ -130,5 +136,14 @@
     "edit": "Modifier",
     "delete": "Supprimer",
     "back": "Retour"
+  },
+  "search": {
+    "paletteTitle": "Palette de commandes",
+    "paletteDescription": "Rechercher et accéder aux tâches, projets et événements.",
+    "placeholder": "Rechercher des tâches, projets, événements...",
+    "empty": "Aucun résultat trouvé.",
+    "tasks": "Tâches",
+    "projects": "Projets",
+    "events": "Événements"
   }
 }

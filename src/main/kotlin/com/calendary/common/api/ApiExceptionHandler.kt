@@ -60,6 +60,14 @@ class ApiExceptionHandler {
 			.status(HttpStatus.BAD_REQUEST)
 			.body(ApiError(code = "validation_error", message = message))
 	}
+
+	@ExceptionHandler(Exception::class)
+	fun handleUnexpected(error: Exception, request: WebRequest): ResponseEntity<ApiError> {
+		log.error("Unhandled error on {}: {}", request.describeRequest(), error.message, error)
+		return ResponseEntity
+			.status(HttpStatus.INTERNAL_SERVER_ERROR)
+			.body(ApiError(code = "internal_error", message = "Something went wrong. Please try again."))
+	}
 }
 
 private fun WebRequest.describeRequest(): String = getDescription(false)

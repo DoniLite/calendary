@@ -93,6 +93,82 @@ class WorkspaceControllerIntegrationTests(
 
 	@Test
 	@Transactional
+	fun `rejects invalid timezone with a clean 400 instead of a 500`() {
+		onboarding.bootstrapSuperAdmin(
+			BootstrapSuperAdminCommand(
+				email = "owner@calendary.dev",
+				password = "very-secret-password",
+				workspaceName = "Owner workspace",
+			),
+		)
+		val session = loginAs("owner@calendary.dev", "very-secret-password")
+		val workspaceId = com.jayway.jsonpath.JsonPath.read<String>(
+			mockMvc.perform(mvcGet("/api/me/workspaces").session(session))
+				.andExpect(status().isOk)
+				.andReturn()
+				.response
+				.contentAsString,
+			"$.items[0].id",
+		)
+
+		mockMvc.perform(
+			mvcPatch("/api/workspaces/$workspaceId/settings")
+				.session(session)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(
+					"""
+					{
+					  "name": "Owner workspace",
+					  "publicSlug": "owner-workspace",
+					  "defaultTimezone": "Not/A_Real_Zone"
+					}
+					""".trimIndent(),
+				),
+		)
+			.andExpect(status().isBadRequest)
+			.andExpect(jsonPath("$.code").value("bad_request"))
+	}
+
+	@Test
+	@Transactional
+	fun `updates workspace theme`() {
+		onboarding.bootstrapSuperAdmin(
+			BootstrapSuperAdminCommand(
+				email = "owner@calendary.dev",
+				password = "very-secret-password",
+				workspaceName = "Owner workspace",
+			),
+		)
+		val session = loginAs("owner@calendary.dev", "very-secret-password")
+		val workspaceId = com.jayway.jsonpath.JsonPath.read<String>(
+			mockMvc.perform(mvcGet("/api/me/workspaces").session(session))
+				.andExpect(status().isOk)
+				.andReturn()
+				.response
+				.contentAsString,
+			"$.items[0].id",
+		)
+
+		mockMvc.perform(
+			mvcPatch("/api/workspaces/$workspaceId/theme")
+				.session(session)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""{ "theme": "ember-dark" }"""),
+		)
+			.andExpect(status().isOk)
+			.andExpect(jsonPath("$.theme").value("ember-dark"))
+
+		mockMvc.perform(
+			mvcPatch("/api/workspaces/$workspaceId/theme")
+				.session(session)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""{ "theme": "not-a-real-theme" }"""),
+		)
+			.andExpect(status().isBadRequest)
+	}
+
+	@Test
+	@Transactional
 	fun `forbids collaborator from updating owner workspace public settings`() {
 		val owner = onboarding.bootstrapSuperAdmin(
 			BootstrapSuperAdminCommand(
