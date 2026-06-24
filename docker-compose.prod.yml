@@ -23,6 +23,10 @@ services:
       CALENDARY_MAIL_FROM: ${CALENDARY_MAIL_FROM}
       CALENDARY_MAIL_REPLY_TO: ${CALENDARY_MAIL_REPLY_TO}
       CALENDARY_PUBLIC_BASE_URL: ${CALENDARY_PUBLIC_BASE_URL}
+      # Public URL of the frontend app. The browser calls this API directly (CORS), so the
+      # backend needs to know which origin to allow. Must match CALENDARY_API_BASE_URL's
+      # counterpart below exactly (scheme + host), e.g. https://calendary.donilite.me
+      CALENDARY_FRONTEND_ORIGIN: ${CALENDARY_FRONTEND_ORIGIN}
       SPRING_MAIL_HOST: ${SPRING_MAIL_HOST}
       SPRING_MAIL_PORT: ${SPRING_MAIL_PORT}
       SPRING_MAIL_USERNAME: ${SPRING_MAIL_USERNAME}
@@ -48,12 +52,11 @@ services:
     image: ghcr.io/${GHCR_OWNER}/calendary-frontend:${IMAGE_TAG:-latest}
     environment:
       PORT: 3000
-      # Defaults to the Docker-network hostname, which only resolves when both
-      # services run from this same compose stack on the same network. If they're
-      # deployed as separate Coolify applications (each with their own domain),
-      # set CALENDARY_API_BASE_URL to the backend's public URL instead, e.g.
-      # https://calendary-backend.donilite.me
-      CALENDARY_API_BASE_URL: ${CALENDARY_API_BASE_URL:-http://backend:8080}
+      # The browser calls this URL directly (no server-side proxy), so it must be the
+      # backend's public address, not the Docker-network hostname — e.g.
+      # https://calendary-backend.donilite.me. The backend must allow this frontend's
+      # origin via CALENDARY_FRONTEND_ORIGIN above for CORS to let the browser read the response.
+      CALENDARY_API_BASE_URL: ${CALENDARY_API_BASE_URL}
     depends_on:
       - backend
     expose:

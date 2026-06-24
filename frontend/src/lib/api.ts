@@ -352,16 +352,22 @@ export async function apiLogout(path = '/api/auth/logout'): Promise<void> {
   await apiRequest<void>(path, { method: 'POST', parseJson: false })
 }
 
-// The browser resolves relative paths against the page origin, but Node's `fetch` (used
-// during SSR) cannot resolve a relative URL at all and throws immediately. Route loaders
-// that call this during SSR (e.g. the public-calendar redirect) would otherwise fail
-// silently inside TanStack Router, rendering an empty page until client-side hydration
-// takes over.
+declare global {
+  interface Window {
+    __API_BASE_URL__?: string
+  }
+}
+
+// Node's `fetch` (used during SSR) cannot resolve a relative URL and throws immediately, so
+// SSR always needs an absolute backend URL. In the browser, requests go straight to the
+// backend's own public origin (server.ts injects it into `window.__API_BASE_URL__`) — the
+// backend has CORS configured for the frontend's origin. In dev, that global is empty and
+// requests stay relative, resolved by vite.config.ts's dev proxy instead.
 function resolveUrl(path: string): string {
-  if (typeof window !== 'undefined') return path
-  // Falls back to the local backend (matches vite.config.ts's dev proxy target).
-  // In production, CALENDARY_API_BASE_URL is set to the backend's address on the
-  // docker network (see docker-compose.prod.yml).
+  if (typeof window !== 'undefined') {
+    const base = window.__API_BASE_URL__
+    return base ? `${base}${path}` : path
+  }
   const base = process.env.CALENDARY_API_BASE_URL ?? 'http://localhost:8080'
   return `${base}${path}`
 }

@@ -2,7 +2,6 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import {pathToFileURL} from 'node:url'
 import express from 'express'
-import {createProxyMiddleware} from 'http-proxy-middleware'
 import {createServer as createViteServer} from 'vite'
 
 const isProduction = process.env.NODE_ENV === 'production'
@@ -10,8 +9,12 @@ const port = Number(process.env.PORT ?? 5173)
 const root = process.cwd()
 const app = express()
 
+// The browser talks directly to the backend's own public origin (CORS-enabled there) instead
+// of going through a same-origin proxy on this server. Baked into the HTML below so client-side
+// code can read it; SSR reads `process.env.CALENDARY_API_BASE_URL` directly (see lib/api.ts).
+const backendBaseUrl = process.env.CALENDARY_API_BASE_URL ?? 'http://localhost:8080'
+
 let vite: Awaited<ReturnType<typeof createViteServer>> | undefined
-let apiProxy: ReturnType<typeof createProxyMiddleware> | undefined
 
 if (!isProduction) {
     vite = await createViteServer({
@@ -21,24 +24,12 @@ if (!isProduction) {
     })
     app.use(vite.middlewares)
 } else {
-    // Vite's own `server.proxy` (vite.config.ts) forwards /api, /public and /ws to the
-    // backend in dev, but that config never runs here: this branch skips Vite entirely.
-    // Without an equivalent proxy, relative API calls from the browser would resolve
-    // against the frontend's own origin instead of reaching the backend container.
-    //
-    // Mounted at the app root (not via `app.use('/api', ...)`) so Express never strips
-    // the matched prefix from `req.url` before the proxy sees it — otherwise the backend
-    // would receive `/auth/me` instead of `/api/auth/me`. `pathFilter` does the routing
-    // instead, leaving the original path intact.
-    const backendBaseUrl = process.env.CALENDARY_API_BASE_URL ?? 'http://backend:8080'
-    apiProxy = createProxyMiddleware({
-        target: backendBaseUrl,
-        changeOrigin: true,
-        ws: true,
-        pathFilter: ['/api', '/public', '/ws'],
-    })
-    app.use(apiProxy)
     app.use('/assets', express.static(path.resolve(root, 'dist/client/assets'), {immutable: true, maxAge: '1y'}))
+    // Vite copies everything from `public/` (favicon.ico, avatar.jpeg, ...) to the root of
+    // `dist/client` at build time, not into `dist/client/assets`. Without this, requests for
+    // those files fall through to the SSR catch-all below, which returns the app's HTML
+    // instead of the actual file.
+    app.use(express.static(path.resolve(root, 'dist/client'), {index: false}))
 }
 
 app.use(async (request, response, next) => {
@@ -68,7 +59,8 @@ app.use(async (request, response, next) => {
             return
         }
 
-        const html = template.replace('<!--ssr-outlet-->', result.html)
+        const injectedConfig = `<script>window.__API_BASE_URL__=${JSON.stringify(isProduction ? backendBaseUrl : '')}</script>`
+        const html = template.replace('<!--ssr-outlet-->', result.html).replace('</head>', `${injectedConfig}</head>`)
         response.status(200).set({'Content-Type': 'text/html'}).end(html)
     } catch (error) {
         vite?.ssrFixStacktrace(error as Error)
@@ -76,10 +68,6 @@ app.use(async (request, response, next) => {
     }
 })
 
-const httpServer = app.listen(port, () => {
+app.listen(port, () => {
     console.log(`Calendary frontend running on http://localhost:${port}`)
 })
-
-if (apiProxy) {
-    httpServer.on('upgrade', apiProxy.upgrade)
-}

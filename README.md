@@ -174,7 +174,7 @@ Le bootstrap du premier super admin est volontairement separe sur `/bootstrap` e
 
 Une fois connecte, le workspace actif vient de la session (`/api/me/workspaces`). Le super admin peut changer le slug public et le fuseau par defaut depuis `Settings > Workspace setup`.
 
-Le proxy Vite envoie `/api`, `/public` et `/ws` vers le backend local `http://localhost:8080`. En production, c'est le serveur Express du frontend qui assure ce proxy vers `CALENDARY_API_BASE_URL` (voir `docker-compose.prod.yml`). Si le front et le back sont deployes comme deux applications Coolify separees (chacune avec son propre domaine), `http://backend:8080` ne resout a rien : il faut alors positionner `CALENDARY_API_BASE_URL` sur l'URL publique du backend (ex. `https://calendary-backend.donilite.me`).
+En dev, le proxy Vite envoie `/api`, `/public` et `/ws` vers le backend local `http://localhost:8080`. En production, le navigateur appelle directement l'URL publique du backend (`CALENDARY_API_BASE_URL`, injectee par le serveur Express dans `window.__API_BASE_URL__`) : il n'y a plus de proxy serveur. Le backend doit autoriser l'origine du frontend via `CALENDARY_FRONTEND_ORIGIN` (CORS, voir `docker-compose.prod.yml`) pour que le navigateur puisse lire la reponse.
 
 Verifier le frontend :
 
