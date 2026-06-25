@@ -3,8 +3,9 @@ import { useEffect, useState } from 'react'
 
 export type RichMarkdownEditorProps = {
   value: string
-  onChange: (value: string) => void
+  onChange?: (value: string) => void
   label?: string
+  readOnly?: boolean
 }
 
 type EditorModule = {
@@ -29,6 +30,15 @@ export function RichMarkdownEditor(props: RichMarkdownEditorProps) {
   }, [])
 
   if (!Editor) {
+    if (props.readOnly) {
+      return (
+        <div className="space-y-3 py-1">
+          <div className="h-5 w-1/2 rounded-md bg-muted" />
+          <div className="h-4 w-full rounded-md bg-muted" />
+          <div className="h-4 w-5/6 rounded-md bg-muted" />
+        </div>
+      )
+    }
     return (
       <div className="min-h-[460px] rounded-md border bg-background">
         <div className="flex min-h-11 items-center gap-2 border-b bg-muted/55 px-3">

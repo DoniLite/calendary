@@ -430,3 +430,122 @@ textarea {
 .calendary-mdx-editor .cm-cursor {
   border-left-color: hsl(var(--foreground)) !important;
 }
+
+/* ── Read-only markdown viewer ────────────────────────────────────────────── */
+
+/* Same theme-variable overrides as the editor so dark/light themes work. */
+.calendary-mdx-viewer .mdxeditor {
+  --basePageBg: hsl(var(--background));
+  --baseBase: hsl(var(--card));
+  --baseBgSubtle: hsl(var(--muted) / 0.55);
+  --baseBg: hsl(var(--secondary));
+  --baseBgHover: hsl(var(--secondary) / 0.8);
+  --baseBgActive: hsl(var(--secondary));
+  --baseLine: hsl(var(--border));
+  --baseBorder: hsl(var(--border));
+  --baseBorderHover: hsl(var(--ring));
+  --baseSolid: hsl(var(--muted-foreground));
+  --baseSolidHover: hsl(var(--foreground));
+  --baseText: hsl(var(--foreground));
+  --baseTextContrast: hsl(var(--foreground));
+  --accentBase: hsl(var(--primary) / 0.08);
+  --accentBgSubtle: hsl(var(--primary) / 0.1);
+  --accentBg: hsl(var(--primary) / 0.16);
+  --accentBgHover: hsl(var(--primary) / 0.22);
+  --accentBgActive: hsl(var(--primary) / 0.28);
+  --accentLine: hsl(var(--primary) / 0.35);
+  --accentBorder: hsl(var(--primary) / 0.45);
+  --accentBorderHover: hsl(var(--primary));
+  --accentSolid: hsl(var(--primary));
+  --accentSolidHover: hsl(var(--primary) / 0.9);
+  --accentText: hsl(var(--primary));
+  --accentTextContrast: hsl(var(--primary-foreground));
+  --font-body: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  min-height: 0;
+  background: transparent;
+  color: hsl(var(--foreground));
+}
+
+.calendary-mdx-viewer-content {
+  padding: 0.25rem 0;
+  font-size: 0.95rem;
+  line-height: 1.75;
+  color: hsl(var(--foreground));
+}
+
+.calendary-mdx-viewer-content h1,
+.calendary-mdx-viewer-content h2,
+.calendary-mdx-viewer-content h3,
+.calendary-mdx-viewer-content p,
+.calendary-mdx-viewer-content li,
+.calendary-mdx-viewer-content td,
+.calendary-mdx-viewer-content th {
+  color: hsl(var(--foreground));
+}
+
+.calendary-mdx-viewer-content h1 {
+  margin: 0 0 1rem;
+  font-size: 1.55rem;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.calendary-mdx-viewer-content h2 {
+  margin: 1.25rem 0 0.65rem;
+  font-size: 1.2rem;
+  font-weight: 650;
+  line-height: 1.3;
+}
+
+.calendary-mdx-viewer-content h3 {
+  margin: 1rem 0 0.5rem;
+  font-size: 1rem;
+  font-weight: 650;
+}
+
+.calendary-mdx-viewer-content p {
+  margin: 0.55rem 0;
+}
+
+.calendary-mdx-viewer-content ul,
+.calendary-mdx-viewer-content ol {
+  margin: 0.65rem 0;
+  padding-left: 1.35rem;
+}
+
+.calendary-mdx-viewer-content a {
+  color: hsl(var(--primary));
+}
+
+.calendary-mdx-viewer-content blockquote {
+  margin: 1rem 0;
+  border-left: 3px solid hsl(var(--primary));
+  padding: 0.3rem 0 0.3rem 0.9rem;
+  color: hsl(var(--foreground) / 0.8);
+}
+
+.calendary-mdx-viewer-content code {
+  border-radius: 0.35rem;
+  background: hsl(var(--secondary));
+  color: hsl(var(--foreground));
+  padding: 0.12rem 0.3rem;
+  font-size: 0.86em;
+}
+
+.calendary-mdx-viewer-content pre {
+  overflow-x: auto;
+  border-radius: var(--radius);
+  background: hsl(var(--secondary));
+  color: hsl(var(--foreground));
+  padding: 0.85rem;
+}
+
+.calendary-mdx-viewer-content table {
+  border-color: hsl(var(--border));
+}
+
+.calendary-mdx-viewer-content th,
+.calendary-mdx-viewer-content td {
+  border-color: hsl(var(--border));
+}

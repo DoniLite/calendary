@@ -27,6 +27,16 @@ import {
 import '@mdxeditor/editor/style.css'
 import type { RichMarkdownEditorProps } from './rich-markdown-editor'
 
+const viewerPlugins = [
+  headingsPlugin({ allowedHeadingLevels: [1, 2, 3] }),
+  listsPlugin(),
+  quotePlugin(),
+  linkPlugin(),
+  tablePlugin(),
+  thematicBreakPlugin(),
+  codeBlockPlugin({ defaultCodeBlockLanguage: 'txt' }),
+]
+
 const editorPlugins = [
   headingsPlugin({ allowedHeadingLevels: [1, 2, 3] }),
   listsPlugin(),
@@ -70,12 +80,26 @@ const editorPlugins = [
   }),
 ]
 
-export function RichMarkdownEditorClient({ value, onChange, label = 'Description' }: RichMarkdownEditorProps) {
+export function RichMarkdownEditorClient({ value, onChange, label = 'Description', readOnly = false }: RichMarkdownEditorProps) {
+  if (readOnly) {
+    return (
+      <div className="calendary-mdx-viewer">
+        <MDXEditor
+          markdown={value}
+          onChange={() => {}}
+          plugins={viewerPlugins}
+          contentEditableClassName="calendary-mdx-viewer-content"
+          readOnly
+        />
+      </div>
+    )
+  }
+
   return (
     <div className="calendary-mdx-editor" aria-label={label}>
       <MDXEditor
         markdown={value}
-        onChange={(nextValue) => onChange(nextValue)}
+        onChange={(nextValue) => onChange?.(nextValue)}
         plugins={editorPlugins}
         contentEditableClassName="calendary-mdx-editor-content"
         placeholder="Write a clear description, add decisions, checklist items, links or technical notes..."

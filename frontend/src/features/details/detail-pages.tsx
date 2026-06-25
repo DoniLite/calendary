@@ -266,9 +266,7 @@ function ResourceDetail({ kind }: { kind: ResourceKind }) {
                 <PanelTitle>Description</PanelTitle>
               </PanelHeader>
               <PanelBody>
-                <article className="prose prose-sm max-w-none whitespace-pre-wrap text-sm leading-6 text-foreground">
-                  {draft.markdown}
-                </article>
+                <RichMarkdownEditor value={draft.markdown} readOnly />
               </PanelBody>
             </Panel>
           </div>
