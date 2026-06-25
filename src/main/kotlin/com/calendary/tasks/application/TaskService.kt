@@ -10,6 +10,7 @@ import com.calendary.notifications.application.NotificationService
 import com.calendary.notifications.domain.NotificationType
 import com.calendary.projects.domain.ProjectType
 import com.calendary.projects.infra.ProjectRepository
+import com.calendary.resources.application.ResourceAccessService
 import com.calendary.resources.domain.ResourceType
 import com.calendary.tasks.domain.Task
 import com.calendary.tasks.domain.TaskAssignee
@@ -32,6 +33,7 @@ class TaskService(
 	private val users: UserAccountRepository,
 	private val projects: ProjectRepository,
 	private val workspaceAccess: WorkspaceAccessService,
+	private val resourceAccess: ResourceAccessService,
 	private val notifications: NotificationService,
 ) {
 	@Transactional
@@ -105,7 +107,9 @@ class TaskService(
 	@Transactional(readOnly = true)
 	fun list(workspaceId: UUID, userId: UUID): List<TaskWithSchedule> {
 		workspaceAccess.requireRead(workspaceId, userId)
+		val isOwner = workspaceAccess.isOwner(workspaceId, userId)
 		val found = tasks.findByWorkspaceIdOrderByCreatedAtDesc(workspaceId)
+			.filter { isOwner || resourceAccess.isVisibleToCollaborator(ResourceType.TASK, it.id, userId) }
 			.onEach { initializeAssignees(it) }
 		val blocksBySourceId = calendarBlocks.findBySourceTypeAndSourceIdIn(CalendarBlockSourceType.TASK, found.map { it.id })
 			.associateBy { it.sourceId }
@@ -117,7 +121,10 @@ class TaskService(
 		workspaceAccess.requireRead(workspaceId, userId)
 		val task = tasks.findByIdAndWorkspaceId(taskId, workspaceId)
 			.orElseThrow { IllegalArgumentException("Task not found.") }
-			.also { initializeAssignees(it) }
+		if (!workspaceAccess.isOwner(workspaceId, userId) && !resourceAccess.isVisibleToCollaborator(ResourceType.TASK, task.id, userId)) {
+			throw IllegalArgumentException("Task not found.")
+		}
+		initializeAssignees(task)
 		val block = calendarBlocks.findBySourceTypeAndSourceIdAndWorkspaceId(CalendarBlockSourceType.TASK, task.id, workspaceId).orElse(null)
 		return TaskWithSchedule(task, block)
 	}
@@ -129,11 +136,11 @@ class TaskService(
 			require(command.plannedStart != null && command.plannedEnd != null) { "Task planning requires start and end." }
 			require(command.plannedEnd.isAfter(command.plannedStart)) { "Task planned end must be after start." }
 		}
-		val workspace = workspaceAccess.requireWrite(command.workspaceId, command.userId)
-		val actor = users.findById(command.userId)
-			.orElseThrow { IllegalArgumentException("User not found.") }
 		val task = tasks.findByIdAndWorkspaceId(command.taskId, command.workspaceId)
 			.orElseThrow { IllegalArgumentException("Task not found.") }
+		val workspace = resourceAccess.requireWrite(ResourceType.TASK, task.id, command.userId)
+		val actor = users.findById(command.userId)
+			.orElseThrow { IllegalArgumentException("User not found.") }
 		val project = command.projectId?.let {
 			projects.findByIdAndWorkspaceId(it, command.workspaceId)
 				.orElseThrow { IllegalArgumentException("Project not found.") }
@@ -192,9 +199,9 @@ class TaskService(
 
 	@Transactional
 	fun updateStatus(workspaceId: UUID, taskId: UUID, userId: UUID, status: TaskStatus): TaskWithSchedule {
-		workspaceAccess.requireWrite(workspaceId, userId)
 		val task = tasks.findByIdAndWorkspaceId(taskId, workspaceId)
 			.orElseThrow { IllegalArgumentException("Task not found.") }
+		resourceAccess.requireWrite(ResourceType.TASK, task.id, userId)
 		task.status = status
 		val block = calendarBlocks.findBySourceTypeAndSourceId(CalendarBlockSourceType.TASK, task.id)
 			.map { it.also { found -> found.busy = status != TaskStatus.DONE && status != TaskStatus.ARCHIVED } }
@@ -240,9 +247,9 @@ class TaskService(
 
 	@Transactional
 	fun delete(workspaceId: UUID, taskId: UUID, userId: UUID) {
-		workspaceAccess.requireWrite(workspaceId, userId)
 		val task = tasks.findByIdAndWorkspaceId(taskId, workspaceId)
 			.orElseThrow { IllegalArgumentException("Task not found.") }
+		resourceAccess.requireWrite(ResourceType.TASK, task.id, userId)
 		calendarBlocks.findBySourceTypeAndSourceId(CalendarBlockSourceType.TASK, task.id)
 			.ifPresent { calendarBlocks.delete(it) }
 		tasks.delete(task)

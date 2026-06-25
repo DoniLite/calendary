@@ -4,6 +4,8 @@ import com.calendary.calendar.domain.CalendarBlockSourceType
 import com.calendary.calendar.domain.CalendarColorPreset
 import com.calendary.calendar.domain.CalendarVisibility
 import com.calendary.calendar.infra.CalendarBlockRepository
+import com.calendary.resources.application.ResourceAccessService
+import com.calendary.resources.domain.ResourceType
 import com.calendary.workspaces.application.WorkspaceAccessService
 import java.time.Instant
 import java.util.UUID
@@ -14,17 +16,20 @@ import org.springframework.transaction.annotation.Transactional
 class CalendarQueryService(
 	private val calendarBlocks: CalendarBlockRepository,
 	private val workspaceAccess: WorkspaceAccessService,
+	private val resourceAccess: ResourceAccessService,
 ) {
 	@Transactional(readOnly = true)
 	fun getCalendar(command: CalendarQuery): CalendarView {
 		require(command.end.isAfter(command.start)) { "Calendar end must be after start." }
 		workspaceAccess.requireRead(command.workspaceId, command.userId)
+		val isOwner = workspaceAccess.isOwner(command.workspaceId, command.userId)
 		val blocks = calendarBlocks
 			.findByWorkspaceIdAndStartsAtLessThanAndEndsAtGreaterThanOrderByStartsAtAsc(
 				workspaceId = command.workspaceId,
 				endsBefore = command.end,
 				startsAfter = command.start,
 			)
+			.filter { isOwner || resourceAccess.isVisibleToCollaborator(ResourceType.valueOf(it.sourceType.name), it.sourceId, command.userId) }
 			.map {
 				CalendarItem(
 					id = it.id,

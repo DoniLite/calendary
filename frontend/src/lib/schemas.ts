@@ -47,7 +47,6 @@ export type InviteCollaboratorFormValues = z.infer<typeof inviteCollaboratorSche
 export type InviteCollaboratorFormInput = z.input<typeof inviteCollaboratorSchema>
 
 export const proposeCollaborationSchema = z.object({
-  email: z.string().min(1, 'Email is required').email('Enter a valid email address'),
   accessLevel: z.enum(['READ', 'WRITE']),
   message: z.string(),
 })

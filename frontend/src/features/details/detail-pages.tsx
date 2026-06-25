@@ -7,7 +7,6 @@ import { useForm } from 'react-hook-form'
 import { Badge } from '../../components/ui/badge'
 import { Button } from '../../components/ui/button'
 import { Combobox, MultiCombobox, type ComboboxOption } from '../../components/ui/combobox'
-import { FieldError } from '../../components/ui/form-field'
 import { Panel, PanelBody, PanelHeader, PanelTitle } from '../../components/ui/panel'
 import { RichMarkdownEditor } from '../../components/rich-markdown-editor'
 import { useWorkspaceSession } from '../auth/workspace-session'
@@ -320,36 +319,54 @@ function AttachmentPanel({ resourceType, resourceId, canWrite }: { resourceType:
 }
 
 function CollaborationPanel({ resourceType, resourceId, canWrite }: { resourceType: ResourceType; resourceId?: string; canWrite: boolean }) {
+  const { activeWorkspaceId, user } = useWorkspaceSession()
+  const membersQuery = useWorkspaceMembersQuery(activeWorkspaceId)
+  // Sharing targets an existing account by email, so the candidate list is restricted to people
+  // who already have access to this workspace (the only set we can enumerate) — anyone else
+  // can be invited as a collaborator first, from the Collaborators page.
+  const memberOptions: ComboboxOption[] = (membersQuery.data?.items ?? [])
+    .filter((member) => member.id !== user?.id)
+    .map((member) => ({ value: member.email, label: member.email }))
+  const [recipientEmail, setRecipientEmail] = useState<string>()
   const { proposeCollaboration } = useCollaborationMutations()
   const disabled = !canWrite || !resourceId || proposeCollaboration.isPending
   const {
     register,
     handleSubmit,
     reset,
-    formState: { errors },
   } = useForm<ProposeCollaborationFormValues>({
     resolver: zodResolver(proposeCollaborationSchema),
-    defaultValues: { email: '', accessLevel: 'READ', message: '' },
+    defaultValues: { accessLevel: 'READ', message: '' },
   })
 
   function onSubmit(values: ProposeCollaborationFormValues) {
-    if (!resourceId) return
-    proposeCollaboration.mutate({ resourceType, resourceId, recipientEmail: values.email, accessLevel: values.accessLevel, message: values.message }, {
-      onSuccess: () => reset(),
+    if (!resourceId || !recipientEmail) return
+    proposeCollaboration.mutate({ resourceType, resourceId, recipientEmail, accessLevel: values.accessLevel, message: values.message }, {
+      onSuccess: () => {
+        reset()
+        setRecipientEmail(undefined)
+      },
     })
   }
 
   return (
     <PanelBody>
       <form className="space-y-3" onSubmit={handleSubmit(onSubmit)}>
-        <input className="h-9 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" type="email" placeholder="collaborator@example.com" disabled={disabled} {...register('email')} />
-        <FieldError message={errors.email?.message} />
+        <Combobox
+          options={memberOptions}
+          value={recipientEmail}
+          onChange={setRecipientEmail}
+          placeholder="Choose a collaborator"
+          searchPlaceholder="Search members..."
+          emptyText="No member found."
+          disabled={disabled}
+        />
         <div className="grid grid-cols-2 gap-2">
           <select className="h-9 rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" disabled={disabled} {...register('accessLevel')}>
             <option value="READ">Read</option>
             <option value="WRITE">Write</option>
           </select>
-          <Button className="h-9" disabled={disabled}>
+          <Button className="h-9" disabled={disabled || !recipientEmail}>
             {proposeCollaboration.isPending ? 'Sending' : 'Propose'}
           </Button>
         </div>
