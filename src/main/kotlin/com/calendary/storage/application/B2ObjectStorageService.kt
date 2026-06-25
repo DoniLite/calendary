@@ -39,11 +39,25 @@ class B2ObjectStorageService(
 		return StoredObject(key = command.key)
 	}
 
-	override fun downloadUrl(key: String): String {
+	override fun downloadUrl(key: String, originalFilename: String, contentType: String): String {
+		// Without b2ContentDisposition/b2ContentType overrides, B2 still serves the file, but
+		// some browsers/OSes fall back to guessing the type from the storage key alone — a bare
+		// UUID with no extension — and land on a generic "unknown file" handler instead of
+		// downloading it as the real PDF/image. The override must be requested in
+		// b2_get_download_authorization AND repeated verbatim as a query parameter on the final
+		// URL, or B2 rejects it.
+		val disposition = "attachment; filename=\"${sanitizeHeaderValue(originalFilename)}\""
+		return signedDownloadUrl(key, mapOf("b2ContentDisposition" to disposition, "b2ContentType" to contentType))
+	}
+
+	override fun inlineUrl(key: String): String = signedDownloadUrl(key, emptyMap())
+
+	private fun signedDownloadUrl(key: String, overrides: Map<String, String>): String {
 		require(properties.bucketName.isNotBlank()) { "B2 bucket name is required." }
 		val auth = authorize()
 		val prefix = key.substringBeforeLast('/', missingDelimiterValue = key)
-		val body = """{"bucketId":"${properties.bucketId}","fileNamePrefix":"$prefix","validDurationInSeconds":${properties.downloadTtlSeconds}}"""
+		val overrideFields = overrides.entries.joinToString("") { (field, value) -> ""","$field":"${escapeJson(value)}"""" }
+		val body = """{"bucketId":"${properties.bucketId}","fileNamePrefix":"$prefix","validDurationInSeconds":${properties.downloadTtlSeconds}$overrideFields}"""
 		val request = HttpRequest.newBuilder(URI.create("${auth.apiUrl}/b2api/v2/b2_get_download_authorization"))
 			.header("Authorization", auth.authorizationToken)
 			.header("Content-Type", "application/json")
@@ -52,7 +66,8 @@ class B2ObjectStorageService(
 		val response = http.send(request, HttpResponse.BodyHandlers.ofString())
 		check(response.statusCode() in 200..299) { "B2 download authorization failed with status ${response.statusCode()}." }
 		val token = extractJsonString(response.body(), "authorizationToken")
-		return "${auth.downloadUrl}/file/${properties.bucketName}/${encodePath(key)}?Authorization=$token"
+		val overrideParams = overrides.entries.joinToString("") { (field, value) -> "&$field=${URLEncoder.encode(value, StandardCharsets.UTF_8)}" }
+		return "${auth.downloadUrl}/file/${properties.bucketName}/${encodePath(key)}?Authorization=$token$overrideParams"
 	}
 
 	private fun authorize(): B2Authorization {
@@ -94,6 +109,14 @@ class B2ObjectStorageService(
 
 	private fun encodePath(value: String): String =
 		value.split("/").joinToString("/") { URLEncoder.encode(it, StandardCharsets.UTF_8).replace("+", "%20") }
+
+	// Drops characters that would either break out of the JSON string or let a crafted filename
+	// inject extra header lines into the Content-Disposition response header.
+	private fun sanitizeHeaderValue(value: String): String =
+		value.replace(Regex("[\r\n\"]"), "_")
+
+	private fun escapeJson(value: String): String =
+		value.replace("\\", "\\\\").replace("\"", "\\\"")
 
 	private fun sha1(bytes: ByteArray): String =
 		MessageDigest.getInstance("SHA-1").digest(bytes).joinToString("") { "%02x".format(it) }

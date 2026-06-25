@@ -136,7 +136,7 @@ class WorkspaceController(
 		workspaceAccess.requireRead(workspaceId, currentUser.id)
 		val workspace = workspaces.findById(workspaceId).orElseThrow { IllegalArgumentException("Workspace not found.") }
 		val key = workspace.iconStorageKey ?: return ResponseEntity.notFound().build()
-		return ResponseEntity.status(HttpStatus.FOUND).location(URI.create(storage.downloadUrl(key))).build()
+		return ResponseEntity.status(HttpStatus.FOUND).location(URI.create(storage.inlineUrl(key))).build()
 	}
 
 	companion object {
@@ -174,6 +174,6 @@ class PublicWorkspaceProfileController(
 		val workspace = workspaces.findByPublicSlugIgnoreCase(publicSlug)
 			.orElseThrow { IllegalArgumentException("Public workspace profile not found.") }
 		val key = workspace.iconStorageKey ?: return ResponseEntity.notFound().build()
-		return ResponseEntity.status(HttpStatus.FOUND).location(URI.create(storage.downloadUrl(key))).build()
+		return ResponseEntity.status(HttpStatus.FOUND).location(URI.create(storage.inlineUrl(key))).build()
 	}
 }
