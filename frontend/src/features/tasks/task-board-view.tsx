@@ -110,12 +110,12 @@ function toTaskItem(task: TaskResponse): TaskItem {
 function TaskColumn({ status, label, tasks, canWrite, inCollaboratorPortal }: { status: TaskStatus; label: string; tasks: TaskItem[]; canWrite: boolean; inCollaboratorPortal: boolean }) {
   const { isOver, setNodeRef } = useDroppable({ id: status })
   return (
-    <div ref={setNodeRef} className="min-h-[420px] rounded-lg border bg-card">
-      <div className="flex items-center justify-between border-b px-3 py-3">
+    <div ref={setNodeRef} className="flex max-h-[calc(100vh-220px)] min-h-[420px] flex-col rounded-lg border bg-card">
+      <div className="flex shrink-0 items-center justify-between border-b px-3 py-3">
         <h2 className="text-sm font-semibold">{label}</h2>
         <Badge tone={isOver ? 'default' : 'muted'}>{tasks.length}</Badge>
       </div>
-      <div className={isOver ? 'space-y-3 p-3 ring-2 ring-inset ring-primary/40' : 'space-y-3 p-3'}>
+      <div className={isOver ? 'flex-1 overflow-y-auto space-y-3 p-3 ring-2 ring-inset ring-primary/40' : 'flex-1 overflow-y-auto space-y-3 p-3'}>
         {tasks.map((task) => (
           <TaskCard key={task.id} task={task} canWrite={canWrite} inCollaboratorPortal={inCollaboratorPortal} />
         ))}

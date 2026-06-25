@@ -60,7 +60,14 @@ app.use(async (request, response, next) => {
         }
 
         const injectedConfig = `<script>window.__API_BASE_URL__=${JSON.stringify(isProduction ? backendBaseUrl : '')}</script>`
-        const html = template.replace('<!--ssr-outlet-->', result.html).replace('</head>', `${injectedConfig}</head>`)
+        // OG/Twitter image must be absolute for social scrapers; derive origin from the request.
+        const proto = (request.get('x-forwarded-proto') ?? request.protocol) || 'https'
+        const host = request.get('x-forwarded-host') ?? request.get('host') ?? 'localhost'
+        const selfOrigin = `${proto}://${host}`
+        const html = template
+            .replace('<!--ssr-outlet-->', result.html)
+            .replace('</head>', `${injectedConfig}</head>`)
+            .replace(/content="\/og-image\.png"/g, `content="${selfOrigin}/og-image.png"`)
         response.status(200).set({'Content-Type': 'text/html'}).end(html)
     } catch (error) {
         vite?.ssrFixStacktrace(error as Error)

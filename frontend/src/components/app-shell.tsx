@@ -78,7 +78,12 @@ export function AppShell({ children }: PropsWithChildren) {
               <div className="mt-1 text-sm font-semibold">{activeWorkspace?.name ?? t('nav.noWorkspaceSelected')}</div>
               <div className="mt-1 text-xs text-muted-foreground">{activeWorkspace?.accessLevel ?? t('nav.readAccess')} {t('nav.access')}</div>
               <div className="mt-2 h-2 rounded-full bg-muted">
-                <div className="h-2 w-2/3 rounded-full bg-primary" />
+                <div
+                  className={cn(
+                    'h-2 rounded-full bg-primary transition-all',
+                    activeWorkspace?.accessLevel === 'OWNER' ? 'w-full' : activeWorkspace?.accessLevel === 'WRITE' ? 'w-2/3' : 'w-1/3',
+                  )}
+                />
               </div>
             </div>
             <ThemeSwitcher />
