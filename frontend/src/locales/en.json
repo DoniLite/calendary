@@ -50,7 +50,8 @@
       "submit": "Sign in",
       "submitting": "Signing in",
       "backToPublicCalendar": "Back to public calendar",
-      "genericError": "Unable to sign in."
+      "genericError": "Unable to sign in.",
+      "forgotPassword": "Forgot password?"
     },
     "bootstrap": {
       "gateTitle": "Server setup",
@@ -87,6 +88,37 @@
       "submit": "Accept invitation",
       "submitting": "Accepting",
       "genericError": "Unable to accept invitation."
+    },
+    "forgotPassword": {
+      "title": "Forgot password",
+      "subtitle": "We'll send you a reset link.",
+      "submit": "Send reset link",
+      "submitting": "Sending",
+      "backToLogin": "Back to login",
+      "success": "If an account with that email exists, a reset link has been sent. Check your inbox.",
+      "error": "Unable to process request. Try again later."
+    },
+    "resetPassword": {
+      "title": "Reset password",
+      "subtitle": "Choose a new password for your account.",
+      "newPassword": "New password",
+      "submit": "Set new password",
+      "submitting": "Saving",
+      "success": "Password updated. Redirecting to login…",
+      "error": "Invalid or expired link. Request a new one.",
+      "requestNew": "Request a new link",
+      "missingTitle": "Invalid link",
+      "missingSubtitle": "This reset link is missing or malformed."
+    },
+    "verifyEmail": {
+      "title": "Email verification",
+      "subtitle": "Confirming your new email address.",
+      "verifying": "Verifying…",
+      "success": "Email address confirmed. Redirecting to login…",
+      "error": "This verification link is invalid or has expired.",
+      "backToLogin": "Back to login",
+      "missingTitle": "Invalid link",
+      "missingSubtitle": "This verification link is missing or malformed."
     }
   },
   "settings": {
@@ -126,6 +158,38 @@
       "inviting": "Inviting",
       "genericError": "Unable to create invitation.",
       "createdFor": "Invitation created for {{email}}"
+    },
+    "changeEmail": {
+      "title": "Change email",
+      "current": "Current:",
+      "newEmail": "New email",
+      "submit": "Send confirmation",
+      "success": "Confirmation email sent to {{email}}. Click the link to confirm.",
+      "error": "Unable to request email change. Check the address and try again."
+    },
+    "changePassword": {
+      "title": "Change password",
+      "currentPassword": "Current password",
+      "newPassword": "New password",
+      "submit": "Update password",
+      "success": "Password updated successfully.",
+      "error": "Current password is incorrect."
+    }
+  },
+  "tasks": {
+    "title": "Tasks",
+    "subtitle": "Workspace tasks. Drag a card between columns to update its status.",
+    "noWorkspace": "Select a workspace to load its tasks.",
+    "loading": "Loading tasks…",
+    "error": "Unable to load tasks. Check your session and workspace.",
+    "empty": "No tasks in this workspace yet.",
+    "newTask": "Task",
+    "columns": {
+      "BACKLOG": "Backlog",
+      "TODO": "Todo",
+      "IN_PROGRESS": "In progress",
+      "REVIEW": "Review",
+      "DONE": "Done"
     }
   },
   "common": {

@@ -50,7 +50,8 @@
       "submit": "Se connecter",
       "submitting": "Connexion en cours",
       "backToPublicCalendar": "Retour au calendrier public",
-      "genericError": "Connexion impossible."
+      "genericError": "Connexion impossible.",
+      "forgotPassword": "Mot de passe oublié ?"
     },
     "bootstrap": {
       "gateTitle": "Configuration du serveur",
@@ -87,6 +88,37 @@
       "submit": "Accepter l'invitation",
       "submitting": "Acceptation en cours",
       "genericError": "Impossible d'accepter l'invitation."
+    },
+    "forgotPassword": {
+      "title": "Mot de passe oublié",
+      "subtitle": "Nous vous enverrons un lien de réinitialisation.",
+      "submit": "Envoyer le lien",
+      "submitting": "Envoi en cours",
+      "backToLogin": "Retour à la connexion",
+      "success": "Si un compte avec cet email existe, un lien de réinitialisation a été envoyé. Vérifiez votre boîte de réception.",
+      "error": "Impossible de traiter la demande. Réessayez plus tard."
+    },
+    "resetPassword": {
+      "title": "Réinitialiser le mot de passe",
+      "subtitle": "Choisissez un nouveau mot de passe pour votre compte.",
+      "newPassword": "Nouveau mot de passe",
+      "submit": "Définir le mot de passe",
+      "submitting": "Enregistrement",
+      "success": "Mot de passe mis à jour. Redirection vers la connexion…",
+      "error": "Lien invalide ou expiré. Demandez-en un nouveau.",
+      "requestNew": "Demander un nouveau lien",
+      "missingTitle": "Lien invalide",
+      "missingSubtitle": "Ce lien de réinitialisation est manquant ou mal formé."
+    },
+    "verifyEmail": {
+      "title": "Vérification de l'email",
+      "subtitle": "Confirmation de votre nouvelle adresse email.",
+      "verifying": "Vérification…",
+      "success": "Adresse email confirmée. Redirection vers la connexion…",
+      "error": "Ce lien de vérification est invalide ou a expiré.",
+      "backToLogin": "Retour à la connexion",
+      "missingTitle": "Lien invalide",
+      "missingSubtitle": "Ce lien de vérification est manquant ou mal formé."
     }
   },
   "settings": {
@@ -126,6 +158,38 @@
       "inviting": "Invitation en cours",
       "genericError": "Impossible de créer l'invitation.",
       "createdFor": "Invitation créée pour {{email}}"
+    },
+    "changeEmail": {
+      "title": "Changer l'email",
+      "current": "Actuel :",
+      "newEmail": "Nouvel email",
+      "submit": "Envoyer la confirmation",
+      "success": "Email de confirmation envoyé à {{email}}. Cliquez sur le lien pour confirmer.",
+      "error": "Impossible de modifier l'email. Vérifiez l'adresse et réessayez."
+    },
+    "changePassword": {
+      "title": "Changer le mot de passe",
+      "currentPassword": "Mot de passe actuel",
+      "newPassword": "Nouveau mot de passe",
+      "submit": "Mettre à jour le mot de passe",
+      "success": "Mot de passe mis à jour avec succès.",
+      "error": "Le mot de passe actuel est incorrect."
+    }
+  },
+  "tasks": {
+    "title": "Tâches",
+    "subtitle": "Tâches de l'espace de travail. Glissez une carte entre les colonnes pour changer son statut.",
+    "noWorkspace": "Sélectionnez un espace de travail pour charger ses tâches.",
+    "loading": "Chargement des tâches…",
+    "error": "Impossible de charger les tâches. Vérifiez votre session et votre espace de travail.",
+    "empty": "Aucune tâche dans cet espace de travail pour l'instant.",
+    "newTask": "Tâche",
+    "columns": {
+      "BACKLOG": "Backlog",
+      "TODO": "À faire",
+      "IN_PROGRESS": "En cours",
+      "REVIEW": "Révision",
+      "DONE": "Terminé"
     }
   },
   "common": {

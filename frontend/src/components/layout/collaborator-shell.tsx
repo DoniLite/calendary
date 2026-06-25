@@ -89,23 +89,45 @@ export function CollaboratorShell() {
         </div>
       </aside>
       <div className="lg:pl-72">
-        <header className="border-b bg-background px-4 py-4 lg:px-6">
-          <div className="flex items-center justify-between gap-4">
-            <div>
+        <header className="sticky top-0 z-20 border-b bg-background/95 backdrop-blur">
+          <div className="flex min-h-16 items-center justify-between gap-4 px-4 lg:px-6">
+            <div className="hidden lg:block">
               <div className="text-lg font-semibold">{t('collaboratorPortal.title')}</div>
               <div className="text-sm text-muted-foreground">{t('collaboratorPortal.subtitle')}</div>
+            </div>
+            <div className="lg:hidden">
+              <img src={iconUrl} alt={activeWorkspace?.name ?? 'Calendary'} className="h-9 w-9 rounded-md border object-cover" />
             </div>
             <div className="flex items-center gap-2">
               <Button variant="secondary" onClick={() => setPaletteOpen(true)} aria-label={t('nav.search')}>
                 <Search className="h-4 w-4" aria-hidden />
               </Button>
               {canWrite && <NewResourceMenu />}
-              <img src={iconUrl} alt={activeWorkspace?.name ?? 'Calendary'} className="h-9 w-9 rounded-md border object-cover" />
+              <img src={iconUrl} alt={activeWorkspace?.name ?? 'Calendary'} className="hidden h-9 w-9 rounded-md border object-cover lg:block" />
               <Button variant="ghost" onClick={() => void handleLogout()} aria-label={t('nav.signOut')}>
                 <LogOut className="h-4 w-4" aria-hidden />
               </Button>
             </div>
           </div>
+          <nav className="flex gap-1 overflow-x-auto border-t px-2 py-2 lg:hidden">
+            {navItems.map((item) => {
+              const Icon = item.icon
+              const active = pathname === item.to
+              return (
+                <Link
+                  key={item.to}
+                  to={item.to}
+                  className={cn(
+                    'flex h-9 shrink-0 items-center gap-2 rounded-md px-3 text-sm font-medium text-muted-foreground',
+                    active && 'bg-primary text-primary-foreground',
+                  )}
+                >
+                  <Icon className="h-4 w-4" aria-hidden />
+                  {t(item.labelKey)}
+                </Link>
+              )
+            })}
+          </nav>
         </header>
         <main className="px-4 py-5 lg:px-6">
           <Outlet />
