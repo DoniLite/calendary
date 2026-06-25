@@ -48,6 +48,10 @@ type ResourceDraft = {
   visibility: 'PRIVATE' | 'PUBLIC'
   startsAt: string
   endsAt: string
+  // Task due date, or Project/Epic due date — date-only ('' if unset).
+  dueAt: string
+  // Project/Epic start date — date-only ('' if unset).
+  projectStartsAt: string
   projectId: string | null
   epicId: string | null
   parentTaskId: string | null
@@ -624,6 +628,33 @@ function ResourceEditor({ kind, mode }: { kind: ResourceKind; mode: EditorMode }
                   </Field>
                 </>
               )}
+              {kind === 'TASK' && (
+                <Field label="Due date">
+                  <input
+                    className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
+                    type="date"
+                    {...register('dueAt')}
+                  />
+                </Field>
+              )}
+              {(kind === 'PROJECT' || kind === 'EPIC') && (
+                <>
+                  <Field label="Start date">
+                    <input
+                      className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
+                      type="date"
+                      {...register('projectStartsAt')}
+                    />
+                  </Field>
+                  <Field label="Due date">
+                    <input
+                      className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
+                      type="date"
+                      {...register('dueAt')}
+                    />
+                  </Field>
+                </>
+              )}
               {(kind === 'TASK' || kind === 'EPIC') && (
                 <Field label="Project">
                   <Combobox
@@ -804,6 +835,8 @@ function createInitialDraft(kind: ResourceKind): ResourceDraft {
     visibility: 'PRIVATE',
     startsAt: tomorrowAt(9),
     endsAt: tomorrowAt(10),
+    dueAt: '',
+    projectStartsAt: '',
     projectId: null,
     epicId: null,
     parentTaskId: null,
@@ -824,6 +857,8 @@ function draftFromEvent(event: EventResponse): ResourceDraft {
     visibility: event.visibility,
     startsAt: formatDateTimeInput(event.startsAt),
     endsAt: formatDateTimeInput(event.endsAt),
+    dueAt: '',
+    projectStartsAt: '',
     projectId: null,
     epicId: null,
     parentTaskId: null,
@@ -841,6 +876,8 @@ function draftFromTask(task: TaskResponse): ResourceDraft {
     visibility: task.visibility,
     startsAt: task.plannedStart ? formatDateTimeInput(task.plannedStart) : tomorrowAt(9),
     endsAt: task.plannedEnd ? formatDateTimeInput(task.plannedEnd) : tomorrowAt(10),
+    dueAt: task.dueAt ? formatDateInput(task.dueAt) : '',
+    projectStartsAt: '',
     projectId: task.projectId,
     epicId: task.epicId,
     parentTaskId: task.parentTaskId,
@@ -856,8 +893,10 @@ function draftFromProject(project: ProjectResponse): ResourceDraft {
     title: project.title,
     status: project.status,
     visibility: project.visibility,
-    startsAt: project.startsAt ? formatDateTimeInput(project.startsAt) : tomorrowAt(9),
-    endsAt: project.dueAt ? formatDateTimeInput(project.dueAt) : tomorrowAt(10),
+    startsAt: tomorrowAt(9),
+    endsAt: tomorrowAt(10),
+    dueAt: project.dueAt ? formatDateInput(project.dueAt) : '',
+    projectStartsAt: project.startsAt ? formatDateInput(project.startsAt) : '',
     projectId: project.parentProjectId,
     epicId: null,
     parentTaskId: null,
@@ -902,6 +941,19 @@ function tomorrowAt(hour: number) {
   return formatDateTimeInput(date.toISOString())
 }
 
+// Formats an ISO instant as an `<input type="date">` value (`YYYY-MM-DD`) in the browser's
+// local timezone.
+function formatDateInput(value: string) {
+  const date = new Date(value)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
+}
+
+function toDateInstant(value: string | undefined): string | null {
+  if (!value) return null
+  return new Date(`${value}T00:00`).toISOString()
+}
+
 function formatDisplayDateTime(datetimeLocal: string) {
   return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(datetimeLocal))
 }
@@ -926,6 +978,8 @@ function toFormValues(draft: ResourceDraft): ResourceFormValues {
     startsAt: draft.startsAt,
     endsAt: draft.endsAt,
     priority: draft.priority,
+    dueAt: draft.dueAt,
+    projectStartsAt: draft.projectStartsAt,
   }
 }
 
@@ -944,7 +998,7 @@ function toTaskPayload(values: ResourceFormValues, color: ItemColor, markdown: s
     priority: values.priority as TaskPriority,
     visibility: values.visibility,
     colorPreset: colorPresetFromItem(color, 'GREEN'),
-    dueAt: null,
+    dueAt: toDateInstant(values.dueAt),
     projectId: relations.projectId ?? null,
     epicId: relations.epicId ?? null,
     parentTaskId: relations.parentTaskId ?? null,
@@ -965,8 +1019,8 @@ function toProjectPayload(values: ResourceFormValues, color: ItemColor, markdown
     visibility: values.visibility,
     colorPreset: colorPresetFromItem(color, 'ORANGE'),
     parentProjectId: relations.projectId ?? null,
-    startsAt: null,
-    dueAt: null,
+    startsAt: toDateInstant(values.projectStartsAt),
+    dueAt: toDateInstant(values.dueAt),
   }
 }
 

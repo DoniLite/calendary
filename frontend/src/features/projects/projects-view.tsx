@@ -1,16 +1,21 @@
 import { Paperclip, Plus } from 'lucide-react'
 import { Link, useRouterState } from '@tanstack/react-router'
+import { useState } from 'react'
 import { Badge } from '../../components/ui/badge'
 import { Panel, PanelBody, PanelHeader, PanelTitle } from '../../components/ui/panel'
+import { TabBar, TabButton } from '../../components/ui/tabs'
 import { useWorkspaceSession } from '../auth/workspace-session'
-import { useProjectsQuery, type ProjectResponse } from '../../lib/api'
+import { useProjectsQuery, type ProjectResponse, type ProjectType } from '../../lib/api'
 import type { ProjectItem } from '../../lib/demo-data'
+
+type ProjectFilter = 'ALL' | ProjectType
 
 export function ProjectsView() {
   const { activeWorkspace, activeWorkspaceId, apiEnabled } = useWorkspaceSession()
   const canWrite = activeWorkspace?.accessLevel !== 'READ'
   const inCollaboratorPortal = useRouterState({ select: (state) => state.location.pathname.startsWith('/collab') })
-  const projectsQuery = useProjectsQuery(activeWorkspaceId)
+  const [filter, setFilter] = useState<ProjectFilter>('ALL')
+  const projectsQuery = useProjectsQuery(activeWorkspaceId, filter === 'ALL' ? undefined : filter)
   const visibleProjects = projectsQuery.data?.projects.map(toProjectItem) ?? []
 
   return (
@@ -20,7 +25,19 @@ export function ProjectsView() {
           <h1 className="text-2xl font-semibold">Projects</h1>
           <p className="text-sm text-muted-foreground">Projects and epics loaded from Calendary API.</p>
         </div>
-        {canWrite && (
+        <div className="flex flex-wrap items-center gap-2">
+          <TabBar>
+            {([
+              { id: 'ALL', label: 'All' },
+              { id: 'PROJECT', label: 'Projects' },
+              { id: 'EPIC', label: 'Epics' },
+            ] as const).map((item) => (
+              <TabButton key={item.id} active={filter === item.id} onClick={() => setFilter(item.id)}>
+                {item.label}
+              </TabButton>
+            ))}
+          </TabBar>
+          {canWrite && (
           inCollaboratorPortal ? (
             <Link to="/collab/projects/new" className="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
               <Plus className="h-4 w-4" aria-hidden />
@@ -32,7 +49,8 @@ export function ProjectsView() {
               Project
             </Link>
           )
-        )}
+          )}
+        </div>
       </div>
 
       {!apiEnabled && <div className="rounded-md border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">Select a workspace to load its projects.</div>}

@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState, type ComponentType, type CSSProperties, t
 import { useForm } from 'react-hook-form'
 import { Badge } from '../../components/ui/badge'
 import { Button } from '../../components/ui/button'
+import { Combobox } from '../../components/ui/combobox'
 import { FieldError } from '../../components/ui/form-field'
 import { Panel, PanelBody, PanelHeader, PanelTitle } from '../../components/ui/panel'
 import type { CalendarItem } from '../../lib/demo-data'
@@ -24,7 +25,10 @@ export function PublicCalendarPage() {
   const days = useMemo(() => weekDays(addDays(startOfWeek(new Date()), weekOffset * 7)), [weekOffset])
   const publicCalendarQuery = usePublicCalendarQuery(publicWorkspace.workspaceId, days[0], addDays(days[0], 7))
   const visiblePublicItems = useMemo(
-    () => publicCalendarQuery.data?.items.map((item, index) => publicApiItemToCalendarItem(item, index, days, timezone, publicWorkspace.displayName)) ?? [],
+    () =>
+      (publicCalendarQuery.data?.items ?? [])
+        .map((item, index) => publicApiItemToCalendarItem(item, index, days, timezone, publicWorkspace.displayName))
+        .filter((item) => item.dayIndex >= 0),
     [publicCalendarQuery.data, days, timezone, publicWorkspace.displayName],
   )
   useEffect(() => {
@@ -321,18 +325,21 @@ export function PublicAvailabilityPage() {
     }
     return map
   }, [slots])
+  const todayKey = useMemo(() => formatDayKey(new Date(), timezone), [timezone])
   const dayOptions = useMemo(
     () =>
-      days.map((day) => {
-        const dayKey = formatDayKey(day, timezone)
-        const daySlots = slotsByDay.get(dayKey) ?? []
-        return {
-          dayKey,
-          label: formatDayLabel(day, timezone),
-          availableCount: daySlots.filter((slot) => slot.available).length,
-        }
-      }),
-    [days, timezone, slotsByDay],
+      days
+        .filter((day) => formatDayKey(day, timezone) >= todayKey)
+        .map((day) => {
+          const dayKey = formatDayKey(day, timezone)
+          const daySlots = slotsByDay.get(dayKey) ?? []
+          return {
+            dayKey,
+            label: formatDayLabel(day, timezone),
+            availableCount: daySlots.filter((slot) => slot.available).length,
+          }
+        }),
+    [days, timezone, slotsByDay, todayKey],
   )
   const firstAvailableDayKey = dayOptions.find((day) => day.availableCount > 0)?.dayKey
   const activeDayKey = (selectedDayKey && dayOptions.some((day) => day.dayKey === selectedDayKey)) ? selectedDayKey : (firstAvailableDayKey ?? dayOptions[0]?.dayKey)
@@ -533,12 +540,16 @@ export function PublicRequestPage() {
                   </select>
                 </Field>
                 <Field icon={CalendarPlus} label="Selected slot">
-                  <select className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" value={selectedSlot?.id ?? ''} onChange={(event) => setSlotId(event.target.value)} disabled={!slots.length}>
-                    {!slots.length && <option value="">No slot available</option>}
-                    {slots.map((slot) => (
-                      <option key={slot.id} value={slot.id}>{slot.label}</option>
-                    ))}
-                  </select>
+                  <Combobox
+                    options={slots.map((slot) => ({ value: slot.id, label: slot.label }))}
+                    value={selectedSlot?.id}
+                    onChange={setSlotId}
+                    placeholder={slots.length ? 'Pick a slot' : 'No slot available'}
+                    searchPlaceholder="Search slots..."
+                    emptyText="No slot found."
+                    disabled={!slots.length}
+                    clearable={false}
+                  />
                 </Field>
               </div>
               {!availabilityQuery.isPending && !slots.length && (

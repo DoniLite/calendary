@@ -27,7 +27,9 @@ export function CalendarView() {
   const days = useMemo(() => Array.from({ length: 7 }, (_, index) => addDays(weekStart, index)), [weekStart])
   const visibleDays = mode === 'day' ? [{ date: days[0], dayIndex: 0 }] : days.map((date, dayIndex) => ({ date, dayIndex }))
   const calendarQuery = useCalendarQuery(activeWorkspaceId, weekStart, weekEnd)
-  const calendarData = calendarQuery.data?.items.map((item) => toCalendarItem(item, days, timezone, activeWorkspace?.name, user?.email)) ?? []
+  const calendarData = (calendarQuery.data?.items ?? [])
+    .map((item) => toCalendarItem(item, days, timezone, activeWorkspace?.name, user?.email))
+    .filter((item) => item.dayIndex >= 0)
   const [selectedId, setSelectedId] = useState(calendarData[0]?.id)
   const selected = calendarData.find((item) => item.id === selectedId) ?? calendarData[0]
 

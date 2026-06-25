@@ -27,10 +27,13 @@ export function formatTimeInTimezone(date: Date, timezone: string) {
   return new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: timezone }).format(date)
 }
 
+// Returns -1 if `date` (rendered in `timezone`) doesn't fall on any of `days` — callers must
+// check for that and exclude the item, not clamp it onto day 0: clamping silently mis-files an
+// item that's actually outside the visible range (e.g. shifted across a week boundary by the
+// display timezone) onto the first day instead of hiding it.
 export function dayIndexInTimezone(date: Date, days: Date[], timezone: string) {
   const dateKey = formatDateKeyInTimezone(date, timezone)
-  const index = days.findIndex((day) => formatDateKeyInTimezone(day, timezone) === dateKey)
-  return Math.max(0, index)
+  return days.findIndex((day) => formatDateKeyInTimezone(day, timezone) === dateKey)
 }
 
 function zonedWallTimeToInstant(day: Date, time: string, timezone: string) {
