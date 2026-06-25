@@ -1,5 +1,5 @@
 import { Link, Outlet, useNavigate, useRouterState } from '@tanstack/react-router'
-import { CalendarDays, CheckCheck, CheckSquare2, Inbox, KanbanSquare, Layers3, LogOut, Plus, Search } from 'lucide-react'
+import { CalendarDays, CheckCheck, CheckSquare2, Inbox, KanbanSquare, Layers3, LogOut, Plus, Search, Settings } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '../ui/button'
@@ -16,6 +16,7 @@ const navItems = [
   { to: '/collab/tasks', labelKey: 'collaboratorPortal.sharedTasks', icon: KanbanSquare },
   { to: '/collab/projects', labelKey: 'collaboratorPortal.projects', icon: Layers3 },
   { to: '/collab/requests', labelKey: 'collaboratorPortal.requests', icon: CheckCheck },
+  { to: '/collab/settings', labelKey: 'nav.settings', icon: Settings },
 ] as const
 
 export function CollaboratorShell() {

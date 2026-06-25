@@ -349,6 +349,12 @@ const collaboratorRequestsRoute = createRoute({
   component: InboxView,
 })
 
+const collaboratorSettingsRoute = createRoute({
+  getParentRoute: () => collaboratorRoute,
+  path: '/settings',
+  component: SettingsView,
+})
+
 const collaboratorTaskCreateRoute = createRoute({
   getParentRoute: () => collaboratorRoute,
   path: '/tasks/new',
@@ -457,6 +463,7 @@ const routeTree = rootRoute.addChildren([
     collaboratorTasksRoute,
     collaboratorProjectsRoute,
     collaboratorRequestsRoute,
+    collaboratorSettingsRoute,
     collaboratorTaskCreateRoute,
     collaboratorTaskDetailRoute,
     collaboratorTaskEditRoute,
