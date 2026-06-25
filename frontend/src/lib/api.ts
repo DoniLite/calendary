@@ -608,6 +608,26 @@ export function useCollaborationMutations() {
   }
 }
 
+export function useChangeEmailMutation() {
+  return useMutation({ mutationFn: (newEmail: string) => apiPatch<void>('/api/auth/email', { newEmail }) })
+}
+
+export function useVerifyEmailMutation() {
+  return useMutation({ mutationFn: (token: string) => apiPost<void>('/api/auth/verify-email', { token }) })
+}
+
+export function useForgotPasswordMutation() {
+  return useMutation({ mutationFn: (email: string) => apiPost<void>('/api/auth/forgot-password', { email }) })
+}
+
+export function useResetPasswordMutation() {
+  return useMutation({ mutationFn: ({ token, newPassword }: { token: string; newPassword: string }) => apiPost<void>('/api/auth/reset-password', { token, newPassword }) })
+}
+
+export function useChangePasswordMutation() {
+  return useMutation({ mutationFn: (values: { currentPassword: string; newPassword: string }) => apiPatch<void>('/api/auth/password', values) })
+}
+
 export function usePublicBookingMutation(workspaceId?: string) {
   const queryClient = useQueryClient()
   return useMutation({
@@ -701,7 +721,22 @@ export function useResourceMutations(workspaceId?: string) {
     onSuccess: invalidateWorkspace,
   })
 
-  return { createTask, updateTask, updateTaskStatus, createProject, updateProject, createEvent, updateEvent }
+  const deleteTask = useMutation({
+    mutationFn: (id: string) => apiDelete(`/api/workspaces/${requireWorkspace()}/tasks/${id}`),
+    onSuccess: invalidateWorkspace,
+  })
+
+  const deleteProject = useMutation({
+    mutationFn: (id: string) => apiDelete(`/api/workspaces/${requireWorkspace()}/projects/${id}`),
+    onSuccess: invalidateWorkspace,
+  })
+
+  const deleteEvent = useMutation({
+    mutationFn: (id: string) => apiDelete(`/api/workspaces/${requireWorkspace()}/events/${id}`),
+    onSuccess: invalidateWorkspace,
+  })
+
+  return { createTask, updateTask, updateTaskStatus, deleteTask, createProject, updateProject, deleteProject, createEvent, updateEvent, deleteEvent }
 }
 
 export function useWorkspaceSettingsMutation(workspaceId?: string) {

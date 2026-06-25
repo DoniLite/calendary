@@ -1,14 +1,20 @@
 package com.calendary.auth.api
 
 import com.calendary.auth.api.dto.AuthenticatedUserResponse
+import com.calendary.auth.api.dto.ChangeEmailRequest
 import com.calendary.auth.api.dto.ChangePasswordRequest
+import com.calendary.auth.api.dto.ForgotPasswordRequest
 import com.calendary.auth.api.dto.LoginRequest
+import com.calendary.auth.api.dto.ResetPasswordRequest
+import com.calendary.auth.api.dto.VerifyEmailChangeRequest
 import com.calendary.auth.api.dto.toAuthenticatedResponse
 import com.calendary.auth.application.AuthService
 import com.calendary.auth.application.AuthSessionService
 import com.calendary.auth.application.LoginCommand
 import com.calendary.users.application.AccountSecurityService
 import com.calendary.users.application.ChangePasswordCommand
+import com.calendary.users.application.RequestEmailChangeCommand
+import com.calendary.users.application.ResetPasswordCommand
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpSession
 import jakarta.validation.Valid
@@ -62,5 +68,40 @@ class AuthController(
 			),
 		)
 		return sessions.currentUser(httpRequest.getSession(false)).toAuthenticatedResponse()
+	}
+
+	@PostMapping("/forgot-password")
+	@ResponseStatus(HttpStatus.NO_CONTENT)
+	fun forgotPassword(@Valid @RequestBody request: ForgotPasswordRequest) {
+		accountSecurity.requestPasswordReset(request.email)
+	}
+
+	@PostMapping("/reset-password")
+	@ResponseStatus(HttpStatus.NO_CONTENT)
+	fun resetPassword(@Valid @RequestBody request: ResetPasswordRequest) {
+		accountSecurity.resetPassword(ResetPasswordCommand(rawToken = request.token, newPassword = request.newPassword))
+	}
+
+	@PatchMapping("/email")
+	@ResponseStatus(HttpStatus.NO_CONTENT)
+	fun changeEmail(
+		@Valid @RequestBody request: ChangeEmailRequest,
+		httpRequest: HttpServletRequest,
+	) {
+		val currentUser = sessions.currentUser(httpRequest.getSession(false))
+		accountSecurity.requestEmailChange(
+			RequestEmailChangeCommand(
+				userId = currentUser.id,
+				currentEmail = currentUser.email,
+				newEmail = request.newEmail,
+			),
+		)
+	}
+
+	// Public — reached via link in email, session may not exist.
+	@PostMapping("/verify-email")
+	@ResponseStatus(HttpStatus.NO_CONTENT)
+	fun verifyEmail(@Valid @RequestBody request: VerifyEmailChangeRequest) {
+		accountSecurity.verifyEmailChange(request.token)
 	}
 }

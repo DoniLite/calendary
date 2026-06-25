@@ -30,10 +30,10 @@ class ResourceAccessService(
 
 	fun requireRead(resourceType: ResourceType, resourceId: UUID, userId: UUID): Workspace {
 		val workspace = resolveOwnerWorkspace(resourceType, resourceId)
-		if (workspaceAccess.canRead(workspace.id, userId)) {
+		if (workspaceAccess.isOwner(workspace.id, userId)) {
 			return workspace
 		}
-		if (shares.existsByResourceTypeAndResourceIdAndRecipientIdAndStatus(resourceType, resourceId, userId, ShareStatus.ACCEPTED)) {
+		if (workspaceAccess.canRead(workspace.id, userId) && isVisibleToCollaborator(resourceType, resourceId, userId)) {
 			return workspace
 		}
 		throw ForbiddenException("Resource access denied.")
@@ -41,20 +41,36 @@ class ResourceAccessService(
 
 	fun requireWrite(resourceType: ResourceType, resourceId: UUID, userId: UUID): Workspace {
 		val workspace = resolveOwnerWorkspace(resourceType, resourceId)
-		if (workspaceAccess.canWrite(workspace.id, userId)) {
+		if (workspaceAccess.isOwner(workspace.id, userId)) {
 			return workspace
 		}
-		if (
-			shares.existsByResourceTypeAndResourceIdAndRecipientIdAndStatusAndAccessLevel(
-				resourceType,
-				resourceId,
-				userId,
-				ShareStatus.ACCEPTED,
-				WorkspaceAccessLevel.WRITE,
-			)
-		) {
+		if (workspaceAccess.canWrite(workspace.id, userId) && isVisibleToCollaborator(resourceType, resourceId, userId, requireWrite = true)) {
 			return workspace
 		}
 		throw ForbiddenException("Resource write access denied.")
+	}
+
+	// Workspace membership lets a collaborator create resources in someone else's workspace, but
+	// it must not make every existing resource visible by default — only the workspace OWNER (the
+	// super admin, on their own workspace) sees everything. A non-owner member only sees what they
+	// created themselves or what's been explicitly shared with them, with sharing cascading from a
+	// Project/Epic down to its tasks (sharing the parent is enough; no need to re-share every task
+	// in it individually).
+	fun isVisibleToCollaborator(resourceType: ResourceType, resourceId: UUID, userId: UUID, requireWrite: Boolean = false): Boolean {
+		val directShare = if (requireWrite) {
+			shares.existsByResourceTypeAndResourceIdAndRecipientIdAndStatusAndAccessLevel(resourceType, resourceId, userId, ShareStatus.ACCEPTED, WorkspaceAccessLevel.WRITE)
+		} else {
+			shares.existsByResourceTypeAndResourceIdAndRecipientIdAndStatus(resourceType, resourceId, userId, ShareStatus.ACCEPTED)
+		}
+		if (directShare) return true
+		return when (resourceType) {
+			ResourceType.TASK -> tasks.findById(resourceId).map { task ->
+				task.createdBy?.id == userId ||
+					task.project?.id?.let { isVisibleToCollaborator(ResourceType.PROJECT, it, userId, requireWrite) } == true ||
+					task.epic?.id?.let { isVisibleToCollaborator(ResourceType.PROJECT, it, userId, requireWrite) } == true
+			}.orElse(false)
+			ResourceType.PROJECT -> projects.findById(resourceId).map { it.createdBy?.id == userId }.orElse(false)
+			ResourceType.EVENT -> events.findById(resourceId).map { it.createdBy?.id == userId }.orElse(false)
+		}
 	}
 }

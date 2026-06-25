@@ -15,6 +15,7 @@ import com.calendary.mail.config.MailProperties
 import com.calendary.notifications.application.CreateNotificationCommand
 import com.calendary.notifications.application.NotificationService
 import com.calendary.notifications.domain.NotificationType
+import com.calendary.users.domain.UserRole
 import com.calendary.workspaces.infra.WorkspaceRepository
 import java.time.Instant
 import java.util.UUID
@@ -40,6 +41,8 @@ class BookingRequestService(
 
 		val workspace = workspaces.findById(command.workspaceId)
 			.orElseThrow { IllegalArgumentException("Workspace not found.") }
+		val workspaceOwner = workspace.owner ?: error("Workspace has no owner.")
+		check(workspaceOwner.role != UserRole.COLLABORATOR) { "This workspace does not accept public booking requests." }
 		val busy = calendarBlocks.existsByWorkspaceIdAndStartsAtLessThanAndEndsAtGreaterThanAndBusyIsTrue(
 			workspaceId = command.workspaceId,
 			endsBefore = command.endsAt,

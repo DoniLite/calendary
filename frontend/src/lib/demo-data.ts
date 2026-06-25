@@ -25,6 +25,9 @@ export type CalendarItem = {
   title: string
   kind: CalendarKind
   dayIndex: number
+  // Day index where the item ends; -1 means outside the visible week. Same as dayIndex for
+  // single-day items. Used by the public calendar to render range stripes and end cards.
+  endDayIndex?: number
   startsAt: string
   endsAt: string
   // ISO instants — absent for static/demo items, present for items built from real API data,

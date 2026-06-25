@@ -10,7 +10,7 @@ import { ProjectsView } from './features/projects/projects-view'
 import { BookingView } from './features/calendar/booking-view'
 import { PublicAvailabilityPage, PublicCalendarEntryPage, PublicCalendarPage, PublicRequestPage } from './features/public/public-calendar-page'
 import { CollaboratorHome } from './features/collaborator/collaborator-home'
-import { AcceptInvitationPage, BootstrapPage, ChangePasswordPage, LoginPage } from './features/auth/auth-pages'
+import { AcceptInvitationPage, BootstrapPage, ChangePasswordPage, ForgotPasswordPage, LoginPage, ResetPasswordPage, VerifyEmailPage } from './features/auth/auth-pages'
 import {
   EpicCreatePage,
   EpicDetailPage,
@@ -263,6 +263,24 @@ const changePasswordRoute = createRoute({
   component: ChangePasswordPage,
 })
 
+const forgotPasswordRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/forgot-password',
+  component: ForgotPasswordPage,
+})
+
+const resetPasswordRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/reset-password',
+  component: ResetPasswordPage,
+})
+
+const verifyEmailRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/verify-email',
+  component: VerifyEmailPage,
+})
+
 const publicRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/p',
@@ -349,6 +367,12 @@ const collaboratorRequestsRoute = createRoute({
   component: InboxView,
 })
 
+const collaboratorSettingsRoute = createRoute({
+  getParentRoute: () => collaboratorRoute,
+  path: '/settings',
+  component: SettingsView,
+})
+
 const collaboratorTaskCreateRoute = createRoute({
   getParentRoute: () => collaboratorRoute,
   path: '/tasks/new',
@@ -427,6 +451,9 @@ const routeTree = rootRoute.addChildren([
   bootstrapRoute,
   acceptInvitationRoute,
   changePasswordRoute,
+  forgotPasswordRoute,
+  resetPasswordRoute,
+  verifyEmailRoute,
   appRoute.addChildren([
     appIndexRoute,
     calendarRoute,
@@ -457,6 +484,7 @@ const routeTree = rootRoute.addChildren([
     collaboratorTasksRoute,
     collaboratorProjectsRoute,
     collaboratorRequestsRoute,
+    collaboratorSettingsRoute,
     collaboratorTaskCreateRoute,
     collaboratorTaskDetailRoute,
     collaboratorTaskEditRoute,

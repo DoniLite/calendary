@@ -9,6 +9,12 @@ import com.calendary.projects.domain.Project
 import com.calendary.projects.domain.ProjectStatus
 import com.calendary.projects.domain.ProjectType
 import com.calendary.projects.infra.ProjectRepository
+import com.calendary.attachments.infra.AttachmentRepository
+import com.calendary.collaboration.infra.ResourceShareRepository
+import com.calendary.notifications.infra.NotificationRepository
+import com.calendary.resources.application.ResourceAccessService
+import com.calendary.resources.domain.ResourceType
+import com.calendary.tasks.infra.TaskRepository
 import com.calendary.users.infra.UserAccountRepository
 import com.calendary.workspaces.application.WorkspaceAccessService
 import java.time.Instant
@@ -22,6 +28,11 @@ class ProjectService(
 	private val calendarBlocks: CalendarBlockRepository,
 	private val users: UserAccountRepository,
 	private val workspaceAccess: WorkspaceAccessService,
+	private val resourceAccess: ResourceAccessService,
+	private val tasks: TaskRepository,
+	private val attachments: AttachmentRepository,
+	private val shares: ResourceShareRepository,
+	private val notificationRepo: NotificationRepository,
 ) {
 	@Transactional
 	fun create(command: CreateProjectCommand): Project {
@@ -58,26 +69,32 @@ class ProjectService(
 	@Transactional(readOnly = true)
 	fun list(workspaceId: UUID, userId: UUID, type: ProjectType?): List<Project> {
 		workspaceAccess.requireRead(workspaceId, userId)
-		return if (type == null) {
+		val isOwner = workspaceAccess.isOwner(workspaceId, userId)
+		val found = if (type == null) {
 			projects.findByWorkspaceIdOrderByCreatedAtDesc(workspaceId)
 		} else {
 			projects.findByWorkspaceIdAndTypeOrderByCreatedAtDesc(workspaceId, type)
 		}
+		return found.filter { isOwner || resourceAccess.isVisibleToCollaborator(ResourceType.PROJECT, it.id, userId) }
 	}
 
 	@Transactional(readOnly = true)
 	fun get(workspaceId: UUID, projectId: UUID, userId: UUID): Project {
 		workspaceAccess.requireRead(workspaceId, userId)
-		return projects.findByIdAndWorkspaceId(projectId, workspaceId)
+		val project = projects.findByIdAndWorkspaceId(projectId, workspaceId)
 			.orElseThrow { IllegalArgumentException("Project not found.") }
+		if (!workspaceAccess.isOwner(workspaceId, userId) && !resourceAccess.isVisibleToCollaborator(ResourceType.PROJECT, project.id, userId)) {
+			throw IllegalArgumentException("Project not found.")
+		}
+		return project
 	}
 
 	@Transactional
 	fun update(command: UpdateProjectCommand): Project {
 		require(command.title.isNotBlank()) { "Project title is required." }
-		workspaceAccess.requireWrite(command.workspaceId, command.userId)
 		val project = projects.findByIdAndWorkspaceId(command.projectId, command.workspaceId)
 			.orElseThrow { IllegalArgumentException("Project not found.") }
+		resourceAccess.requireWrite(ResourceType.PROJECT, project.id, command.userId)
 		val parent = command.parentProjectId?.let {
 			projects.findByIdAndWorkspaceId(it, command.workspaceId)
 				.orElseThrow { IllegalArgumentException("Parent project not found.") }
@@ -98,6 +115,31 @@ class ProjectService(
 		project.dueAt = command.dueAt
 		syncCalendarBlock(project)
 		return project
+	}
+
+	@Transactional
+	fun delete(workspaceId: UUID, projectId: UUID, userId: UUID) {
+		val project = projects.findByIdAndWorkspaceId(projectId, workspaceId)
+			.orElseThrow { IllegalArgumentException("Project not found.") }
+		resourceAccess.requireWrite(ResourceType.PROJECT, project.id, userId)
+
+		// Cascade through tasks that belong to this project or epic
+		val childTasks = tasks.findByProjectIdOrEpicId(project.id, project.id)
+		if (childTasks.isNotEmpty()) {
+			val taskIds = childTasks.map { it.id }
+			attachments.deleteByResourceTypeAndResourceIdIn(ResourceType.TASK, taskIds)
+			shares.deleteByResourceTypeAndResourceIdIn(ResourceType.TASK, taskIds)
+			notificationRepo.deleteByResourceIdIn(taskIds)
+			calendarBlocks.deleteBySourceTypeAndSourceIdIn(CalendarBlockSourceType.TASK, taskIds)
+			tasks.deleteAll(childTasks)
+		}
+
+		attachments.deleteByResourceTypeAndResourceId(ResourceType.PROJECT, project.id)
+		shares.deleteByResourceTypeAndResourceId(ResourceType.PROJECT, project.id)
+		notificationRepo.deleteByResourceId(project.id)
+		calendarBlocks.findBySourceTypeAndSourceId(CalendarBlockSourceType.PROJECT, project.id)
+			.ifPresent { calendarBlocks.delete(it) }
+		projects.delete(project)
 	}
 
 	private fun requireValidPlanning(startsAt: Instant?, dueAt: Instant?) {

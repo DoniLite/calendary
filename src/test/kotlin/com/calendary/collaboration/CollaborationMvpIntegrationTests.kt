@@ -28,6 +28,62 @@ class CollaborationMvpIntegrationTests(
 ) : PostgresIntegrationTest() {
 	@Test
 	@Transactional
+	fun `rejects collaboration proposal and records decision`() {
+		val workspaceId = bootstrapOwnerAndCollaborator()
+		val ownerSession = loginAs("owner@calendary.dev", "very-secret-password")
+		val collaboratorSession = loginAs("assistant@calendary.dev", "collaborator-password")
+
+		val taskId = mockMvc.perform(
+			mvcPost("/api/workspaces/$workspaceId/tasks")
+				.session(ownerSession)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""{"title":"Task to reject"}"""),
+		)
+			.andExpect(status().isCreated)
+			.andReturn()
+			.response
+			.contentAsString
+			.let { JsonPath.read<String>(it, "$.id") }
+
+		val shareId = mockMvc.perform(
+			mvcPost("/api/collaborations")
+				.session(ownerSession)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(
+					"""
+					{
+					  "resourceType": "TASK",
+					  "resourceId": "$taskId",
+					  "recipientEmail": "assistant@calendary.dev",
+					  "accessLevel": "READ",
+					  "message": "Have a look?"
+					}
+					""".trimIndent(),
+				),
+		)
+			.andExpect(status().isCreated)
+			.andExpect(jsonPath("$.status").value("PENDING"))
+			.andReturn()
+			.response
+			.contentAsString
+			.let { JsonPath.read<String>(it, "$.id") }
+
+		mockMvc.perform(mvcPatch("/api/collaborations/$shareId/reject").session(collaboratorSession))
+			.andExpect(status().isOk)
+			.andExpect(jsonPath("$.status").value("REJECTED"))
+
+		// After rejection the task must not appear in the collaborator's view.
+		mockMvc.perform(
+			org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+				.get("/api/workspaces/$workspaceId/tasks")
+				.session(collaboratorSession),
+		)
+			.andExpect(status().isOk)
+			.andExpect(jsonPath("$.items").isEmpty)
+	}
+
+	@Test
+	@Transactional
 	fun `proposes and accepts collaboration on task`() {
 		val workspaceId = bootstrapOwnerAndCollaborator()
 		val ownerSession = loginAs("owner@calendary.dev", "very-secret-password")

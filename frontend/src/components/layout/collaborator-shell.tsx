@@ -1,6 +1,6 @@
 import { Link, Outlet, useNavigate, useRouterState } from '@tanstack/react-router'
-import { CalendarDays, CheckCheck, CheckSquare2, Inbox, KanbanSquare, Layers3, LogOut, Plus, Search } from 'lucide-react'
-import { useState } from 'react'
+import { CalendarDays, CheckCheck, CheckSquare2, Inbox, KanbanSquare, Layers3, LogOut, Plus, Search, Settings } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '../ui/button'
 import { useWorkspaceSession } from '../../features/auth/workspace-session'
@@ -16,6 +16,7 @@ const navItems = [
   { to: '/collab/tasks', labelKey: 'collaboratorPortal.sharedTasks', icon: KanbanSquare },
   { to: '/collab/projects', labelKey: 'collaboratorPortal.projects', icon: Layers3 },
   { to: '/collab/requests', labelKey: 'collaboratorPortal.requests', icon: CheckCheck },
+  { to: '/collab/settings', labelKey: 'nav.settings', icon: Settings },
 ] as const
 
 export function CollaboratorShell() {
@@ -117,25 +118,43 @@ export function CollaboratorShell() {
 
 function NewResourceMenu() {
   const { t } = useTranslation()
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    function onOutside(event: MouseEvent) {
+      if (ref.current && !ref.current.contains(event.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', onOutside)
+    return () => document.removeEventListener('mousedown', onOutside)
+  }, [open])
+
   return (
-    <details className="group relative">
-      <summary className="inline-flex h-9 cursor-pointer list-none items-center justify-center gap-2 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      >
         <Plus className="h-4 w-4" aria-hidden />
         {t('nav.new')}
-      </summary>
-      <div className="absolute right-0 top-11 z-30 w-56 rounded-lg border bg-card p-2 shadow-panel">
-        <NewResourceLink to="/collab/events/new" icon={CalendarDays} label={t('nav.event')} />
-        <NewResourceLink to="/collab/tasks/new" icon={CheckSquare2} label={t('nav.task')} />
-        <NewResourceLink to="/collab/projects/new" icon={Layers3} label={t('nav.project')} />
-        <NewResourceLink to="/collab/epics/new" icon={KanbanSquare} label={t('nav.epic')} />
-      </div>
-    </details>
+      </button>
+      {open && (
+        <div className="absolute right-0 top-11 z-30 w-56 rounded-lg border bg-card p-2 shadow-panel">
+          <NewResourceLink to="/collab/events/new" icon={CalendarDays} label={t('nav.event')} onNavigate={() => setOpen(false)} />
+          <NewResourceLink to="/collab/tasks/new" icon={CheckSquare2} label={t('nav.task')} onNavigate={() => setOpen(false)} />
+          <NewResourceLink to="/collab/projects/new" icon={Layers3} label={t('nav.project')} onNavigate={() => setOpen(false)} />
+          <NewResourceLink to="/collab/epics/new" icon={KanbanSquare} label={t('nav.epic')} onNavigate={() => setOpen(false)} />
+        </div>
+      )}
+    </div>
   )
 }
 
-function NewResourceLink({ to, icon: Icon, label }: { to: '/collab/events/new' | '/collab/tasks/new' | '/collab/projects/new' | '/collab/epics/new'; icon: typeof Plus; label: string }) {
+function NewResourceLink({ to, icon: Icon, label, onNavigate }: { to: '/collab/events/new' | '/collab/tasks/new' | '/collab/projects/new' | '/collab/epics/new'; icon: typeof Plus; label: string; onNavigate: () => void }) {
   return (
-    <Link to={to} className="flex h-10 items-center gap-3 rounded-md px-3 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground">
+    <Link to={to} onClick={onNavigate} className="flex h-10 items-center gap-3 rounded-md px-3 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground">
       <Icon className="h-4 w-4" aria-hidden />
       {label}
     </Link>

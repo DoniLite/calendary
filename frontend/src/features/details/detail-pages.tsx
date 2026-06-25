@@ -1,13 +1,12 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Link, useParams, useRouterState } from '@tanstack/react-router'
-import { ArrowLeft, CalendarClock, CheckSquare2, Edit3, Layers3, Paperclip, Save } from 'lucide-react'
+import { Link, useNavigate, useParams, useRouterState } from '@tanstack/react-router'
+import { ArrowLeft, CalendarClock, CheckSquare2, Edit3, Layers3, Paperclip, Save, Trash2 } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { Badge } from '../../components/ui/badge'
 import { Button } from '../../components/ui/button'
 import { Combobox, MultiCombobox, type ComboboxOption } from '../../components/ui/combobox'
-import { FieldError } from '../../components/ui/form-field'
 import { Panel, PanelBody, PanelHeader, PanelTitle } from '../../components/ui/panel'
 import { RichMarkdownEditor } from '../../components/rich-markdown-editor'
 import { useWorkspaceSession } from '../auth/workspace-session'
@@ -156,6 +155,7 @@ function useResourceDraftQuery(kind: ResourceKind, workspaceId: string | undefin
 function ResourceDetail({ kind }: { kind: ResourceKind }) {
   const { activeWorkspace, activeWorkspaceId, apiEnabled } = useWorkspaceSession()
   const pathname = useRouterState({ select: (state) => state.location.pathname })
+  const navigate = useNavigate()
   const resourceId = useResourceIdParam(kind)
   const { draft, members, isPending, isError } = useResourceDraftQuery(kind, activeWorkspaceId, resourceId)
   const projectsQuery = useProjectsQuery(activeWorkspaceId, 'PROJECT')
@@ -168,6 +168,16 @@ function ResourceDetail({ kind }: { kind: ResourceKind }) {
   const canWrite = activeWorkspace?.accessLevel !== 'READ'
   const inCollaboratorPortal = pathname.startsWith('/collab')
   const resourceType = resourceTypeFor(kind)
+  const mutations = useResourceMutations(activeWorkspaceId)
+  const [confirmDelete, setConfirmDelete] = useState(false)
+
+  async function handleDelete() {
+    if (!resourceId) return
+    if (kind === 'TASK') await mutations.deleteTask.mutateAsync(resourceId)
+    else if (kind === 'EVENT') await mutations.deleteEvent.mutateAsync(resourceId)
+    else await mutations.deleteProject.mutateAsync(resourceId)
+    await navigate({ to: backTo })
+  }
 
   return (
     <div className="space-y-5">
@@ -187,7 +197,28 @@ function ResourceDetail({ kind }: { kind: ResourceKind }) {
             </div>
           </div>
         </div>
-        {canWrite && draft && <EditLink kind={kind} resourceId={resourceId ?? ''} inCollaboratorPortal={inCollaboratorPortal} />}
+        {canWrite && draft && (
+          <div className="flex shrink-0 items-center gap-2">
+            <EditLink kind={kind} resourceId={resourceId ?? ''} inCollaboratorPortal={inCollaboratorPortal} />
+            {confirmDelete ? (
+              <>
+                <Button
+                  className="h-9 bg-busy text-white hover:bg-busy/90"
+                  onClick={() => void handleDelete()}
+                  disabled={mutations.deleteTask.isPending || mutations.deleteProject.isPending || mutations.deleteEvent.isPending}
+                >
+                  <Trash2 className="h-4 w-4" aria-hidden />
+                  Confirm delete
+                </Button>
+                <Button variant="secondary" className="h-9" onClick={() => setConfirmDelete(false)}>Cancel</Button>
+              </>
+            ) : (
+              <Button variant="ghost" className="h-9 text-muted-foreground hover:text-busy" onClick={() => setConfirmDelete(true)}>
+                <Trash2 className="h-4 w-4" aria-hidden />
+              </Button>
+            )}
+          </div>
+        )}
       </div>
 
       {!apiEnabled && <div className="rounded-md border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">Select a workspace to view this resource.</div>}
@@ -267,7 +298,7 @@ function ResourceDetail({ kind }: { kind: ResourceKind }) {
               <PanelHeader>
                 <PanelTitle>Collaboration</PanelTitle>
               </PanelHeader>
-              <CollaborationPanel resourceType={resourceType} resourceId={resourceId} canWrite={canWrite} />
+              <CollaborationPanel resourceType={resourceType} resourceId={resourceId} canWrite={canWrite} parentProjectId={kind === 'TASK' ? (draft?.projectId ?? null) : null} />
             </Panel>
           </aside>
         </section>
@@ -319,37 +350,67 @@ function AttachmentPanel({ resourceType, resourceId, canWrite }: { resourceType:
   )
 }
 
-function CollaborationPanel({ resourceType, resourceId, canWrite }: { resourceType: ResourceType; resourceId?: string; canWrite: boolean }) {
+function CollaborationPanel({ resourceType, resourceId, canWrite, parentProjectId }: { resourceType: ResourceType; resourceId?: string; canWrite: boolean; parentProjectId?: string | null }) {
+  const { activeWorkspaceId, user } = useWorkspaceSession()
+  const membersQuery = useWorkspaceMembersQuery(activeWorkspaceId)
+  // Sharing targets an existing account by email, so the candidate list is restricted to people
+  // who already have access to this workspace (the only set we can enumerate) — anyone else
+  // can be invited as a collaborator first, from the Collaborators page.
+  const memberOptions: ComboboxOption[] = (membersQuery.data?.items ?? [])
+    .filter((member) => member.id !== user?.id)
+    .map((member) => ({ value: member.email, label: member.email }))
+  const [recipientEmail, setRecipientEmail] = useState<string>()
   const { proposeCollaboration } = useCollaborationMutations()
   const disabled = !canWrite || !resourceId || proposeCollaboration.isPending
   const {
     register,
     handleSubmit,
     reset,
-    formState: { errors },
   } = useForm<ProposeCollaborationFormValues>({
     resolver: zodResolver(proposeCollaborationSchema),
-    defaultValues: { email: '', accessLevel: 'READ', message: '' },
+    defaultValues: { accessLevel: 'READ', message: '' },
   })
 
+  // Tasks belonging to a project inherit access through the project share — direct task
+  // sharing would bypass the intended granularity and confuse the access model.
+  if (resourceType === 'TASK' && parentProjectId) {
+    return (
+      <PanelBody>
+        <p className="text-sm text-muted-foreground">
+          This task belongs to a project. Share the <strong>project</strong> to give a collaborator access to all its tasks.
+        </p>
+      </PanelBody>
+    )
+  }
+
   function onSubmit(values: ProposeCollaborationFormValues) {
-    if (!resourceId) return
-    proposeCollaboration.mutate({ resourceType, resourceId, recipientEmail: values.email, accessLevel: values.accessLevel, message: values.message }, {
-      onSuccess: () => reset(),
+    if (!resourceId || !recipientEmail) return
+    proposeCollaboration.mutate({ resourceType, resourceId, recipientEmail, accessLevel: values.accessLevel, message: values.message }, {
+      onSuccess: () => {
+        reset()
+        setRecipientEmail(undefined)
+      },
     })
   }
 
   return (
     <PanelBody>
       <form className="space-y-3" onSubmit={handleSubmit(onSubmit)}>
-        <input className="h-9 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" type="email" placeholder="collaborator@example.com" disabled={disabled} {...register('email')} />
-        <FieldError message={errors.email?.message} />
+        <Combobox
+          options={memberOptions}
+          value={recipientEmail}
+          onChange={setRecipientEmail}
+          placeholder="Choose a collaborator"
+          searchPlaceholder="Search members..."
+          emptyText="No member found."
+          disabled={disabled}
+        />
         <div className="grid grid-cols-2 gap-2">
           <select className="h-9 rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" disabled={disabled} {...register('accessLevel')}>
             <option value="READ">Read</option>
             <option value="WRITE">Write</option>
           </select>
-          <Button className="h-9" disabled={disabled}>
+          <Button className="h-9" disabled={disabled || !recipientEmail}>
             {proposeCollaboration.isPending ? 'Sending' : 'Propose'}
           </Button>
         </div>

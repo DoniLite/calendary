@@ -39,7 +39,7 @@ class OnboardingControllerIntegrationTests(
 				status { isCreated() }
 				jsonPath("$.email") { value("owner@calendary.dev") }
 				jsonPath("$.role") { value("SUPER_ADMIN") }
-				jsonPath("$.status") { value("PASSWORD_CHANGE_REQUIRED") }
+				jsonPath("$.status") { value("ACTIVE") }
 			}
 	}
 
@@ -189,7 +189,7 @@ class OnboardingControllerIntegrationTests(
 				status { isCreated() }
 				jsonPath("$.email") { value("assistant@calendary.dev") }
 				jsonPath("$.role") { value("COLLABORATOR") }
-				jsonPath("$.status") { value("PASSWORD_CHANGE_REQUIRED") }
+				jsonPath("$.status") { value("ACTIVE") }
 			}
 	}
 

@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Image, Paintbrush, Server, UserPlus } from 'lucide-react'
+import { Image, KeyRound, Mail, Paintbrush, Server, UserPlus } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
@@ -11,13 +11,15 @@ import { useTheme } from '../theme/theme-provider'
 import { themes } from '../theme/themes'
 import {
   apiPost,
+  useChangeEmailMutation,
+  useChangePasswordMutation,
   useWorkspaceIconMutation,
   useWorkspaceSettingsMutation,
   workspaceIconUrl,
   type CreatedInvitationResponse,
   type WorkspaceResponse,
 } from '../../lib/api'
-import { inviteCollaboratorSchema, workspaceSettingsSchema, type InviteCollaboratorFormInput, type InviteCollaboratorFormValues, type WorkspaceSettingsFormValues } from '../../lib/schemas'
+import { changeEmailSchema, changePasswordSchema, inviteCollaboratorSchema, workspaceSettingsSchema, type ChangeEmailFormValues, type ChangePasswordFormValues, type InviteCollaboratorFormInput, type InviteCollaboratorFormValues, type WorkspaceSettingsFormValues } from '../../lib/schemas'
 
 const fallbackTimezones = ['UTC', 'Europe/Paris', 'Europe/London', 'Africa/Abidjan', 'America/New_York', 'America/Los_Angeles', 'Asia/Tokyo', 'Asia/Dubai']
 
@@ -43,6 +45,10 @@ export function SettingsView() {
       <div className="grid gap-4 md:grid-cols-2">
         <WorkspaceIconCard workspace={activeWorkspace} />
         <WorkspaceThemeCard workspace={activeWorkspace} />
+      </div>
+      <div className="grid gap-4 md:grid-cols-2">
+        <ChangeEmailCard />
+        <ChangePasswordCard />
       </div>
     </div>
   )
@@ -263,6 +269,101 @@ function WorkspaceThemeCard({ workspace }: { workspace?: WorkspaceResponse }) {
             </button>
           ))}
         </div>
+      </PanelBody>
+    </Panel>
+  )
+}
+
+function ChangeEmailCard() {
+  const { user } = useWorkspaceSession()
+  const mutation = useChangeEmailMutation()
+  const [pendingEmail, setPendingEmail] = useState<string>()
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors, isSubmitting },
+  } = useForm<ChangeEmailFormValues>({
+    resolver: zodResolver(changeEmailSchema),
+    defaultValues: { newEmail: '' },
+  })
+
+  async function onSubmit(values: ChangeEmailFormValues) {
+    await mutation.mutateAsync(values.newEmail)
+    setPendingEmail(values.newEmail)
+    reset()
+  }
+
+  return (
+    <Panel>
+      <PanelHeader>
+        <PanelTitle className="flex items-center gap-2">
+          <Mail className="h-4 w-4 text-muted-foreground" aria-hidden />
+          Change email
+        </PanelTitle>
+      </PanelHeader>
+      <PanelBody>
+        <p className="mb-3 text-sm text-muted-foreground">Current: <span className="font-medium text-foreground">{user?.email}</span></p>
+        <form className="grid gap-3" onSubmit={handleSubmit(onSubmit)}>
+          <label className="grid gap-2">
+            <span className="text-sm font-medium">New email</span>
+            <input className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" type="email" placeholder="new@example.com" {...register('newEmail')} />
+            <FieldError message={errors.newEmail?.message} />
+          </label>
+          {pendingEmail && (
+            <p className="text-sm text-available">Confirmation email sent to <strong>{pendingEmail}</strong>. Click the link to confirm.</p>
+          )}
+          {mutation.isError && <p className="text-sm text-busy">Unable to request email change. Check the address and try again.</p>}
+          <Button className="w-fit" disabled={isSubmitting}>Send confirmation</Button>
+        </form>
+      </PanelBody>
+    </Panel>
+  )
+}
+
+function ChangePasswordCard() {
+  const mutation = useChangePasswordMutation()
+  const [success, setSuccess] = useState(false)
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors, isSubmitting },
+  } = useForm<ChangePasswordFormValues>({
+    resolver: zodResolver(changePasswordSchema),
+    defaultValues: { currentPassword: '', newPassword: '' },
+  })
+
+  async function onSubmit(values: ChangePasswordFormValues) {
+    await mutation.mutateAsync(values)
+    setSuccess(true)
+    reset()
+  }
+
+  return (
+    <Panel>
+      <PanelHeader>
+        <PanelTitle className="flex items-center gap-2">
+          <KeyRound className="h-4 w-4 text-muted-foreground" aria-hidden />
+          Change password
+        </PanelTitle>
+      </PanelHeader>
+      <PanelBody>
+        <form className="grid gap-3" onSubmit={handleSubmit(onSubmit)}>
+          <label className="grid gap-2">
+            <span className="text-sm font-medium">Current password</span>
+            <input className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" type="password" {...register('currentPassword')} />
+            <FieldError message={errors.currentPassword?.message} />
+          </label>
+          <label className="grid gap-2">
+            <span className="text-sm font-medium">New password</span>
+            <input className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" type="password" placeholder="12+ characters" {...register('newPassword')} />
+            <FieldError message={errors.newPassword?.message} />
+          </label>
+          {success && <p className="text-sm text-available">Password updated successfully.</p>}
+          {mutation.isError && <p className="text-sm text-busy">Current password is incorrect.</p>}
+          <Button className="w-fit" disabled={isSubmitting}>Update password</Button>
+        </form>
       </PanelBody>
     </Panel>
   )

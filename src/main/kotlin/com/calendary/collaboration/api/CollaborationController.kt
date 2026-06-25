@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
+import org.springframework.transaction.annotation.Transactional
 
 @RestController
 @RequestMapping("/api/collaborations")
@@ -26,8 +27,12 @@ class CollaborationController(
 	private val sessions: AuthSessionService,
 	private val collaborations: CollaborationService,
 ) {
+	// .toResponse() reads requestedBy.email/recipient.email, lazily fetched ManyToOne relations —
+	// with spring.jpa.open-in-view=false the Hibernate session is gone by the time the controller
+	// runs unless the whole method (service call + mapping) stays inside one transaction.
 	@PostMapping
 	@ResponseStatus(HttpStatus.CREATED)
+	@Transactional
 	fun propose(
 		@Valid @RequestBody request: ProposeCollaborationRequest,
 		httpRequest: HttpServletRequest,
@@ -46,18 +51,21 @@ class CollaborationController(
 	}
 
 	@GetMapping("/inbox")
+	@Transactional
 	fun inbox(httpRequest: HttpServletRequest): CollaborationListResponse {
 		val currentUser = sessions.currentUser(httpRequest.getSession(false))
 		return collaborations.inbox(currentUser.id).toResponse()
 	}
 
 	@GetMapping("/sent")
+	@Transactional
 	fun sent(httpRequest: HttpServletRequest): CollaborationListResponse {
 		val currentUser = sessions.currentUser(httpRequest.getSession(false))
 		return collaborations.sent(currentUser.id).toResponse()
 	}
 
 	@PatchMapping("/{id}/accept")
+	@Transactional
 	fun accept(
 		@PathVariable id: UUID,
 		httpRequest: HttpServletRequest,
@@ -67,6 +75,7 @@ class CollaborationController(
 	}
 
 	@PatchMapping("/{id}/reject")
+	@Transactional
 	fun reject(
 		@PathVariable id: UUID,
 		httpRequest: HttpServletRequest,

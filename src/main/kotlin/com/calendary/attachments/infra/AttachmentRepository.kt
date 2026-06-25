@@ -10,4 +10,8 @@ interface AttachmentRepository : JpaRepository<Attachment, UUID> {
 	fun findByResourceTypeAndResourceIdOrderByCreatedAtDesc(resourceType: ResourceType, resourceId: UUID): List<Attachment>
 
 	fun findByIdAndResourceTypeAndResourceId(id: UUID, resourceType: ResourceType, resourceId: UUID): Optional<Attachment>
+
+	fun deleteByResourceTypeAndResourceId(resourceType: ResourceType, resourceId: UUID)
+
+	fun deleteByResourceTypeAndResourceIdIn(resourceType: ResourceType, resourceIds: Collection<UUID>)
 }

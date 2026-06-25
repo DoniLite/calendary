@@ -12,6 +12,10 @@ import com.calendary.events.infra.EventRepository
 import com.calendary.notifications.application.CreateNotificationCommand
 import com.calendary.notifications.application.NotificationService
 import com.calendary.notifications.domain.NotificationType
+import com.calendary.attachments.infra.AttachmentRepository
+import com.calendary.collaboration.infra.ResourceShareRepository
+import com.calendary.notifications.infra.NotificationRepository
+import com.calendary.resources.application.ResourceAccessService
 import com.calendary.resources.domain.ResourceType
 import com.calendary.users.domain.UserAccount
 import com.calendary.users.infra.UserAccountRepository
@@ -28,7 +32,11 @@ class EventService(
 	private val calendarBlocks: CalendarBlockRepository,
 	private val users: UserAccountRepository,
 	private val workspaceAccess: WorkspaceAccessService,
+	private val resourceAccess: ResourceAccessService,
 	private val notifications: NotificationService,
+	private val attachments: AttachmentRepository,
+	private val shares: ResourceShareRepository,
+	private val notificationRepo: NotificationRepository,
 ) {
 	@Transactional
 	fun create(command: CreateEventCommand): Event {
@@ -76,20 +84,24 @@ class EventService(
 	@Transactional(readOnly = true)
 	fun get(workspaceId: UUID, eventId: UUID, userId: UUID): Event {
 		workspaceAccess.requireRead(workspaceId, userId)
-		return events.findFirstByIdAndWorkspaceId(eventId, workspaceId)
+		val event = events.findFirstByIdAndWorkspaceId(eventId, workspaceId)
 			.orElseThrow { IllegalArgumentException("Event not found.") }
-			.also { initializeParticipants(it) }
+		if (!workspaceAccess.isOwner(workspaceId, userId) && !resourceAccess.isVisibleToCollaborator(ResourceType.EVENT, event.id, userId)) {
+			throw IllegalArgumentException("Event not found.")
+		}
+		initializeParticipants(event)
+		return event
 	}
 
 	@Transactional
 	fun update(command: UpdateEventCommand): Event {
 		require(command.title.isNotBlank()) { "Event title is required." }
 		require(command.endsAt.isAfter(command.startsAt)) { "Event end must be after start." }
-		workspaceAccess.requireWrite(command.workspaceId, command.userId)
-		val actor = users.findById(command.userId)
-			.orElseThrow { IllegalArgumentException("User not found.") }
 		val event = events.findFirstByIdAndWorkspaceId(command.eventId, command.workspaceId)
 			.orElseThrow { IllegalArgumentException("Event not found.") }
+		resourceAccess.requireWrite(ResourceType.EVENT, event.id, command.userId)
+		val actor = users.findById(command.userId)
+			.orElseThrow { IllegalArgumentException("User not found.") }
 		event.title = command.title.trim()
 		event.description = command.description
 		event.startsAt = command.startsAt
@@ -151,9 +163,12 @@ class EventService(
 
 	@Transactional
 	fun delete(workspaceId: UUID, eventId: UUID, userId: UUID) {
-		workspaceAccess.requireWrite(workspaceId, userId)
 		val event = events.findFirstByIdAndWorkspaceId(eventId, workspaceId)
 			.orElseThrow { IllegalArgumentException("Event not found.") }
+		resourceAccess.requireWrite(ResourceType.EVENT, event.id, userId)
+		attachments.deleteByResourceTypeAndResourceId(ResourceType.EVENT, event.id)
+		shares.deleteByResourceTypeAndResourceId(ResourceType.EVENT, event.id)
+		notificationRepo.deleteByResourceId(event.id)
 		calendarBlocks.findBySourceTypeAndSourceId(CalendarBlockSourceType.EVENT, event.id)
 			.ifPresent { calendarBlocks.delete(it) }
 		events.delete(event)

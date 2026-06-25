@@ -31,7 +31,7 @@ export function BookingView() {
     formState: { errors },
   } = useForm<BookingRequestFormValues>({
     resolver: zodResolver(bookingRequestSchema),
-    defaultValues: { name: '', email: '', timezone: 'Europe/Paris', message: '' },
+    defaultValues: { name: '', email: '', timezone: 'Europe/Paris', date: new Date().toISOString().slice(0, 10), time: '09:00', durationMinutes: 60, message: '' },
   })
   const timezone = watch('timezone')
   const visibleSlots = (availabilityQuery.data?.slots ?? [])

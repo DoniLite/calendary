@@ -48,7 +48,7 @@ class OnboardingServiceIntegrationTests(
 
 		assertEquals("owner@calendary.dev", superAdmin.email)
 		assertEquals(UserRole.SUPER_ADMIN, superAdmin.role)
-		assertEquals(UserStatus.PASSWORD_CHANGE_REQUIRED, superAdmin.status)
+		assertEquals(UserStatus.ACTIVE, superAdmin.status)
 		assertTrue(passwordEncoder.matches("very-secret-password", superAdmin.passwordHash))
 		assertNotEquals("very-secret-password", superAdmin.passwordHash)
 		assertEquals(1, workspaces.countByOwnerId(superAdmin.id))
@@ -151,7 +151,7 @@ class OnboardingServiceIntegrationTests(
 
 		assertEquals("assistant@calendary.dev", collaborator.email)
 		assertEquals(UserRole.COLLABORATOR, collaborator.role)
-		assertEquals(UserStatus.PASSWORD_CHANGE_REQUIRED, collaborator.status)
+		assertEquals(UserStatus.ACTIVE, collaborator.status)
 		assertTrue(passwordEncoder.matches("collaborator-password", collaborator.passwordHash))
 		assertEquals(1, workspaces.countByOwnerId(collaborator.id))
 		assertEquals(2, memberships.countByUserId(collaborator.id))
