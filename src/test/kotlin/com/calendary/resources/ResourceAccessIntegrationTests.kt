@@ -96,6 +96,73 @@ class ResourceAccessIntegrationTests(
 
 	@Test
 	@Transactional
+	fun `sharing an epic cascades visibility to tasks nested under it`() {
+		val workspaceId = bootstrapOwnerAndCollaborator(ownerEmail = "rbac-owner4@calendary.dev", collaboratorEmail = "rbac-assistant4@calendary.dev")
+		val ownerSession = loginAs("rbac-owner4@calendary.dev", "very-secret-password")
+		val collaboratorSession = loginAs("rbac-assistant4@calendary.dev", "collaborator-password")
+
+		val projectId = createProject(workspaceId, ownerSession)
+		val epicId = createEpic(workspaceId, ownerSession, projectId)
+		val taskId = createTaskUnderEpic(workspaceId, ownerSession, epicId)
+
+		val shareId = mockMvc.perform(
+			mvcPost("/api/collaborations")
+				.session(ownerSession)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""{"resourceType":"PROJECT","resourceId":"$epicId","recipientEmail":"rbac-assistant4@calendary.dev","accessLevel":"READ","message":"epic share"}"""),
+		)
+			.andExpect(status().isCreated)
+			.andReturn()
+			.response
+			.contentAsString
+			.let { JsonPath.read<String>(it, "$.id") }
+
+		mockMvc.perform(mvcPatch("/api/collaborations/$shareId/accept").session(collaboratorSession))
+			.andExpect(status().isOk)
+
+		mockMvc.perform(mvcGet("/api/workspaces/$workspaceId/tasks").session(collaboratorSession))
+			.andExpect(status().isOk)
+			.andExpect(jsonPath("$.items[0].id").value(taskId))
+	}
+
+	@Test
+	@Transactional
+	fun `a task inside a project can be directly shared without sharing the project`() {
+		val workspaceId = bootstrapOwnerAndCollaborator(ownerEmail = "rbac-owner5@calendary.dev", collaboratorEmail = "rbac-assistant5@calendary.dev")
+		val ownerSession = loginAs("rbac-owner5@calendary.dev", "very-secret-password")
+		val collaboratorSession = loginAs("rbac-assistant5@calendary.dev", "collaborator-password")
+
+		val projectId = createProject(workspaceId, ownerSession)
+		val taskId = createTask(workspaceId, ownerSession, projectId)
+
+		val shareId = mockMvc.perform(
+			mvcPost("/api/collaborations")
+				.session(ownerSession)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""{"resourceType":"TASK","resourceId":"$taskId","recipientEmail":"rbac-assistant5@calendary.dev","accessLevel":"WRITE","message":"direct task share"}"""),
+		)
+			.andExpect(status().isCreated)
+			.andReturn()
+			.response
+			.contentAsString
+			.let { JsonPath.read<String>(it, "$.id") }
+
+		mockMvc.perform(mvcPatch("/api/collaborations/$shareId/accept").session(collaboratorSession))
+			.andExpect(status().isOk)
+
+		// Task is visible directly — project share is not required.
+		mockMvc.perform(mvcGet("/api/workspaces/$workspaceId/tasks").session(collaboratorSession))
+			.andExpect(status().isOk)
+			.andExpect(jsonPath("$.items[0].id").value(taskId))
+
+		// Project itself remains hidden — only the task was shared.
+		mockMvc.perform(mvcGet("/api/workspaces/$workspaceId/projects").session(collaboratorSession))
+			.andExpect(status().isOk)
+			.andExpect(jsonPath("$.projects").isEmpty)
+	}
+
+	@Test
+	@Transactional
 	fun `the workspace owner still sees every resource regardless of sharing`() {
 		val workspaceId = bootstrapOwnerAndCollaborator(ownerEmail = "rbac-owner3@calendary.dev", collaboratorEmail = "rbac-assistant3@calendary.dev")
 		val ownerSession = loginAs("rbac-owner3@calendary.dev", "very-secret-password")
@@ -112,12 +179,38 @@ class ResourceAccessIntegrationTests(
 			.andExpect(jsonPath("$.items.length()").value(1))
 	}
 
-	private fun createProject(workspaceId: UUID, session: MockHttpSession): String =
+	private fun createProject(workspaceId: UUID, session: MockHttpSession, type: String = "PROJECT"): String =
 		mockMvc.perform(
 			mvcPost("/api/workspaces/$workspaceId/projects")
 				.session(session)
 				.contentType(MediaType.APPLICATION_JSON)
-				.content("""{"title":"Owner-only project","type":"PROJECT"}"""),
+				.content("""{"title":"Owner-only project","type":"$type"}"""),
+		)
+			.andExpect(status().isCreated)
+			.andReturn()
+			.response
+			.contentAsString
+			.let { JsonPath.read<String>(it, "$.id") }
+
+	private fun createEpic(workspaceId: UUID, session: MockHttpSession, parentProjectId: String): String =
+		mockMvc.perform(
+			mvcPost("/api/workspaces/$workspaceId/projects")
+				.session(session)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""{"title":"Owner-only epic","type":"EPIC","parentProjectId":"$parentProjectId"}"""),
+		)
+			.andExpect(status().isCreated)
+			.andReturn()
+			.response
+			.contentAsString
+			.let { JsonPath.read<String>(it, "$.id") }
+
+	private fun createTaskUnderEpic(workspaceId: UUID, session: MockHttpSession, epicId: String): String =
+		mockMvc.perform(
+			mvcPost("/api/workspaces/$workspaceId/tasks")
+				.session(session)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""{"title":"Owner-only task","epicId":"$epicId"}"""),
 		)
 			.andExpect(status().isCreated)
 			.andReturn()
