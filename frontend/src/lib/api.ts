@@ -355,6 +355,10 @@ export async function apiPatch<T>(path: string, body: unknown): Promise<T> {
   return apiRequest<T>(path, { method: 'PATCH', body })
 }
 
+export async function apiDelete(path: string): Promise<void> {
+  await apiRequest<void>(path, { method: 'DELETE', parseJson: false })
+}
+
 export async function apiPostForm<T>(path: string, formData: FormData): Promise<T> {
   return apiRequest<T>(path, { method: 'POST', formData })
 }
@@ -423,12 +427,31 @@ export function useProjectsQuery(workspaceId?: string, type?: ProjectType) {
   return useApiQuery<ProjectListResponse>(['projects', workspaceId ?? 'none', type ?? 'all'], `/api/workspaces/${workspaceId}/projects${query}`, Boolean(workspaceId))
 }
 
+export type WorkspaceMemberResponse = {
+  id: string
+  email: string
+  accessLevel: WorkspaceAccessLevel
+}
+
 export type MemberListResponse = {
-  items: MemberSummaryResponse[]
+  items: WorkspaceMemberResponse[]
 }
 
 export function useWorkspaceMembersQuery(workspaceId?: string) {
   return useApiQuery<MemberListResponse>(['workspace-members', workspaceId ?? 'none'], `/api/workspaces/${workspaceId}/members`, Boolean(workspaceId))
+}
+
+export function useRemoveMemberMutation(workspaceId?: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (userId: string) => {
+      if (!workspaceId) throw new Error('No active workspace selected.')
+      return apiDelete(`/api/workspaces/${workspaceId}/members/${userId}`)
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['workspace-members', workspaceId ?? 'none'] })
+    },
+  })
 }
 
 export function useCalendarQuery(workspaceId: string | undefined, start: Date, end: Date) {

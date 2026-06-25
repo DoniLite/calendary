@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Copy, Mail, Shield, UserPlus, Users } from 'lucide-react'
+import { Copy, Mail, Shield, UserMinus, UserPlus, Users } from 'lucide-react'
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { Badge } from '../../components/ui/badge'
@@ -7,11 +7,13 @@ import { Button } from '../../components/ui/button'
 import { FieldError } from '../../components/ui/form-field'
 import { Panel, PanelBody, PanelHeader, PanelTitle } from '../../components/ui/panel'
 import { useWorkspaceSession } from '../auth/workspace-session'
-import { apiPost, type CreatedInvitationResponse } from '../../lib/api'
+import { apiPost, useRemoveMemberMutation, useWorkspaceMembersQuery, type CreatedInvitationResponse } from '../../lib/api'
 import { inviteCollaboratorSchema, type InviteCollaboratorFormInput, type InviteCollaboratorFormValues } from '../../lib/schemas'
 
 export function CollaboratorsView() {
-  const { activeWorkspace, user, workspaces } = useWorkspaceSession()
+  const { activeWorkspace, activeWorkspaceId, user } = useWorkspaceSession()
+  const membersQuery = useWorkspaceMembersQuery(activeWorkspaceId)
+  const removeMember = useRemoveMemberMutation(activeWorkspaceId)
   const [createdInvitations, setCreatedInvitations] = useState<CreatedInvitationResponse[]>([])
   const [error, setError] = useState('')
   const {
@@ -95,17 +97,31 @@ export function CollaboratorsView() {
             </PanelTitle>
           </PanelHeader>
           <PanelBody className="space-y-3">
-            {workspaces.map((workspace) => (
-              <article key={workspace.id} className={workspace.id === activeWorkspace?.id ? 'rounded-md border border-primary/40 bg-primary/5 p-3' : 'rounded-md border p-3'}>
+            {membersQuery.isPending && <div className="rounded-md border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">Loading members...</div>}
+            {membersQuery.isError && <div className="rounded-md border border-busy/30 bg-busy/10 px-3 py-2 text-sm">Unable to load members.</div>}
+            {!membersQuery.isPending && !membersQuery.data?.items.length && (
+              <div className="rounded-md border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">No members yet.</div>
+            )}
+            {membersQuery.data?.items.map((member) => (
+              <article key={member.id} className={member.id === user?.id ? 'rounded-md border border-primary/40 bg-primary/5 p-3' : 'rounded-md border p-3'}>
                 <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <div className="font-medium">{workspace.name}</div>
-                    <div className="text-xs text-muted-foreground">Owner {workspace.ownerId.slice(0, 8)}</div>
+                  <div className="min-w-0">
+                    <div className="truncate font-medium">{member.email}</div>
+                    {member.id === user?.id && <div className="text-xs text-muted-foreground">You</div>}
                   </div>
-                  <Badge tone={workspace.accessLevel === 'OWNER' ? 'success' : workspace.accessLevel === 'WRITE' ? 'default' : 'muted'}>{workspace.accessLevel}</Badge>
+                  <div className="flex items-center gap-2">
+                    <Badge tone={member.accessLevel === 'OWNER' ? 'success' : member.accessLevel === 'WRITE' ? 'default' : 'muted'}>{member.accessLevel}</Badge>
+                    {activeWorkspace?.accessLevel === 'OWNER' && member.id !== user?.id && (
+                      <Button variant="secondary" className="h-8" disabled={removeMember.isPending} onClick={() => removeMember.mutate(member.id)}>
+                        <UserMinus className="h-3.5 w-3.5" aria-hidden />
+                        Remove
+                      </Button>
+                    )}
+                  </div>
                 </div>
               </article>
             ))}
+            {removeMember.isError && <div className="rounded-md border border-busy/30 bg-busy/10 px-3 py-2 text-sm">Unable to remove this collaborator.</div>}
           </PanelBody>
         </Panel>
       </section>

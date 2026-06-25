@@ -5,7 +5,7 @@ import { Badge } from '../../components/ui/badge'
 import { Panel, PanelBody, PanelHeader, PanelTitle } from '../../components/ui/panel'
 import { TabBar, TabButton } from '../../components/ui/tabs'
 import { useWorkspaceSession } from '../auth/workspace-session'
-import { useProjectsQuery, type ProjectResponse, type ProjectType } from '../../lib/api'
+import { useProjectsQuery, useTasksQuery, type ProjectResponse, type ProjectType, type TaskResponse } from '../../lib/api'
 import type { ProjectItem } from '../../lib/demo-data'
 
 type ProjectFilter = 'ALL' | ProjectType
@@ -16,7 +16,9 @@ export function ProjectsView() {
   const inCollaboratorPortal = useRouterState({ select: (state) => state.location.pathname.startsWith('/collab') })
   const [filter, setFilter] = useState<ProjectFilter>('ALL')
   const projectsQuery = useProjectsQuery(activeWorkspaceId, filter === 'ALL' ? undefined : filter)
-  const visibleProjects = projectsQuery.data?.projects.map(toProjectItem) ?? []
+  const tasksQuery = useTasksQuery(activeWorkspaceId)
+  const tasks = tasksQuery.data?.items ?? []
+  const visibleProjects = projectsQuery.data?.projects.map((project) => toProjectItem(project, tasks)) ?? []
 
   return (
     <div className="space-y-5">
@@ -122,15 +124,17 @@ function ProjectLink({ project, inCollaboratorPortal }: { project: ProjectItem; 
   )
 }
 
-function toProjectItem(project: ProjectResponse): ProjectItem {
+function toProjectItem(project: ProjectResponse, allTasks: TaskResponse[]): ProjectItem {
+  const linkedTasks = allTasks.filter((task) => (project.type === 'EPIC' ? task.epicId === project.id : task.projectId === project.id))
+  const doneTasks = linkedTasks.filter((task) => task.status === 'DONE')
   return {
     id: project.id,
     title: project.title,
     type: project.type,
     status: project.status,
-    progress: project.status === 'DONE' ? 100 : project.status === 'ACTIVE' ? 48 : 0,
+    progress: linkedTasks.length ? Math.round((doneTasks.length / linkedTasks.length) * 100) : 0,
     dueAt: project.dueAt ? new Date(project.dueAt).toLocaleDateString() : 'No due date',
-    tasks: 0,
+    tasks: linkedTasks.length,
     color: {
       name: project.color.preset,
       background: project.color.background,
