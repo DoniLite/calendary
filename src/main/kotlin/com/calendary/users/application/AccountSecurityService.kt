@@ -70,6 +70,46 @@ class AccountSecurityService(
 		user.passwordResetExpiresAt = null
 		user.status = UserStatus.ACTIVE
 	}
+
+	@Transactional
+	fun requestEmailChange(command: RequestEmailChangeCommand) {
+		val newEmail = command.newEmail.trim().lowercase()
+		require(newEmail.isNotBlank()) { "Email is required." }
+		require(newEmail != command.currentEmail.trim().lowercase()) { "New email must be different from current." }
+		require(!users.existsByEmailIgnoreCaseAndIdNot(newEmail, command.userId)) { "Email already in use." }
+
+		val user = users.findById(command.userId).orElseThrow { IllegalArgumentException("User not found.") }
+		val rawToken = UUID.randomUUID().toString()
+		user.pendingEmail = newEmail
+		user.emailVerificationToken = tokenHasher.hash(rawToken)
+		user.emailVerificationExpiresAt = Instant.now().plus(24, ChronoUnit.HOURS)
+
+		val verifyUrl = "${mailProperties.publicBaseUrl}/verify-email?token=$rawToken"
+		mail.send(
+			SendMailCommand(
+				to = newEmail,
+				subject = "Confirm your new Calendary email",
+				body = "You requested an email change for your Calendary account.\n\nClick the button below to confirm your new address. This link expires in 24 hours.\n\nIf you did not make this request, you can safely ignore this email.",
+				actionLabel = "Confirm email",
+				actionUrl = verifyUrl,
+			),
+		)
+	}
+
+	@Transactional
+	fun verifyEmailChange(rawToken: String) {
+		val hashedToken = tokenHasher.hash(rawToken)
+		val user = users.findByEmailVerificationToken(hashedToken)
+			.orElseThrow { IllegalArgumentException("Invalid or expired verification link.") }
+		check(user.emailVerificationExpiresAt?.isAfter(Instant.now()) == true) { "Verification link has expired." }
+		val newEmail = user.pendingEmail ?: error("No pending email on this account.")
+		require(!users.existsByEmailIgnoreCaseAndIdNot(newEmail, user.id)) { "Email already in use." }
+
+		user.email = newEmail
+		user.pendingEmail = null
+		user.emailVerificationToken = null
+		user.emailVerificationExpiresAt = null
+	}
 }
 
 data class ChangePasswordCommand(
@@ -81,4 +121,10 @@ data class ChangePasswordCommand(
 data class ResetPasswordCommand(
 	val rawToken: String,
 	val newPassword: String,
+)
+
+data class RequestEmailChangeCommand(
+	val userId: UUID,
+	val currentEmail: String,
+	val newEmail: String,
 )

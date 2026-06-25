@@ -16,4 +16,8 @@ interface UserAccountRepository : JpaRepository<UserAccount, UUID> {
 	fun findByRole(role: UserRole): Optional<UserAccount>
 
 	fun findByPasswordResetToken(token: String): Optional<UserAccount>
+
+	fun findByEmailVerificationToken(token: String): Optional<UserAccount>
+
+	fun existsByEmailIgnoreCaseAndIdNot(email: String, id: UUID): Boolean
 }

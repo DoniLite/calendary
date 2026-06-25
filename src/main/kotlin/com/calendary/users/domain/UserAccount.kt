@@ -30,4 +30,13 @@ open class UserAccount(
 
 	@Column(name = "password_reset_expires_at")
 	open var passwordResetExpiresAt: Instant? = null,
+
+	@Column(name = "pending_email")
+	open var pendingEmail: String? = null,
+
+	@Column(name = "email_verification_token")
+	open var emailVerificationToken: String? = null,
+
+	@Column(name = "email_verification_expires_at")
+	open var emailVerificationExpiresAt: Instant? = null,
 ) : AuditableEntity()

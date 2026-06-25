@@ -8,7 +8,7 @@ import { Link, useNavigate } from '@tanstack/react-router'
 import { Button } from '../../components/ui/button'
 import { FieldError } from '../../components/ui/form-field'
 import { Panel, PanelBody, PanelHeader, PanelTitle } from '../../components/ui/panel'
-import { apiPatch, apiPost, fetchDefaultPublicProfile, publicWorkspaceIconUrl, useForgotPasswordMutation, useResetPasswordMutation, type AuthenticatedUserResponse } from '../../lib/api'
+import { apiPatch, apiPost, fetchDefaultPublicProfile, publicWorkspaceIconUrl, useForgotPasswordMutation, useResetPasswordMutation, useVerifyEmailMutation, type AuthenticatedUserResponse } from '../../lib/api'
 import { useQuery } from '@tanstack/react-query'
 import {
   acceptInvitationSchema,
@@ -338,6 +338,54 @@ export function ResetPasswordPage() {
           <Button disabled={isSubmitting}>Set new password</Button>
           <Link to="/forgot-password" className="text-center text-sm text-muted-foreground hover:text-foreground">Request a new link</Link>
         </form>
+      )}
+    </AuthFrame>
+  )
+}
+
+export function VerifyEmailPage() {
+  const navigate = useNavigate()
+  const token = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('token') ?? '' : ''
+  const mutation = useVerifyEmailMutation()
+  const [done, setDone] = useState(false)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    if (!token) return
+    mutation.mutate(token, {
+      onSuccess: () => {
+        setDone(true)
+        setTimeout(() => { void navigate({ to: '/login' }) }, 3000)
+      },
+      onError: () => setError('This verification link is invalid or has expired.'),
+    })
+  // Run once on mount — mutation ref is stable.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token])
+
+  if (!token) {
+    return (
+      <AuthFrame title="Invalid link" subtitle="This verification link is missing or malformed.">
+        <Link to="/login" className="block text-center text-sm text-muted-foreground hover:text-foreground">Back to login</Link>
+      </AuthFrame>
+    )
+  }
+
+  return (
+    <AuthFrame title="Email verification" subtitle="Confirming your new email address.">
+      {done ? (
+        <div className="space-y-3">
+          <div className="rounded-md border border-available/30 bg-available/10 p-4 text-sm">
+            Email address confirmed. Redirecting to login…
+          </div>
+        </div>
+      ) : error ? (
+        <div className="space-y-3">
+          <div className="rounded-md border border-busy/30 bg-busy/10 p-4 text-sm">{error}</div>
+          <Link to="/login" className="block text-center text-sm text-muted-foreground hover:text-foreground">Back to login</Link>
+        </div>
+      ) : (
+        <div className="py-4 text-center text-sm text-muted-foreground">Verifying…</div>
       )}
     </AuthFrame>
   )

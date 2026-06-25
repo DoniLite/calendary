@@ -64,6 +64,11 @@ export const resourceFormSchema = z.object({
 })
 export type ResourceFormValues = z.infer<typeof resourceFormSchema>
 
+export const changeEmailSchema = z.object({
+  newEmail: z.string().min(1, 'Email is required').email('Enter a valid email address'),
+})
+export type ChangeEmailFormValues = z.infer<typeof changeEmailSchema>
+
 export const forgotPasswordSchema = z.object({
   email: z.string().min(1, 'Email is required').email('Enter a valid email address'),
 })

@@ -608,6 +608,14 @@ export function useCollaborationMutations() {
   }
 }
 
+export function useChangeEmailMutation() {
+  return useMutation({ mutationFn: (newEmail: string) => apiPatch<void>('/api/auth/email', { newEmail }) })
+}
+
+export function useVerifyEmailMutation() {
+  return useMutation({ mutationFn: (token: string) => apiPost<void>('/api/auth/verify-email', { token }) })
+}
+
 export function useForgotPasswordMutation() {
   return useMutation({ mutationFn: (email: string) => apiPost<void>('/api/auth/forgot-password', { email }) })
 }

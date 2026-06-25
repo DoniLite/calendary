@@ -10,7 +10,7 @@ import { ProjectsView } from './features/projects/projects-view'
 import { BookingView } from './features/calendar/booking-view'
 import { PublicAvailabilityPage, PublicCalendarEntryPage, PublicCalendarPage, PublicRequestPage } from './features/public/public-calendar-page'
 import { CollaboratorHome } from './features/collaborator/collaborator-home'
-import { AcceptInvitationPage, BootstrapPage, ChangePasswordPage, ForgotPasswordPage, LoginPage, ResetPasswordPage } from './features/auth/auth-pages'
+import { AcceptInvitationPage, BootstrapPage, ChangePasswordPage, ForgotPasswordPage, LoginPage, ResetPasswordPage, VerifyEmailPage } from './features/auth/auth-pages'
 import {
   EpicCreatePage,
   EpicDetailPage,
@@ -275,6 +275,12 @@ const resetPasswordRoute = createRoute({
   component: ResetPasswordPage,
 })
 
+const verifyEmailRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/verify-email',
+  component: VerifyEmailPage,
+})
+
 const publicRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/p',
@@ -447,6 +453,7 @@ const routeTree = rootRoute.addChildren([
   changePasswordRoute,
   forgotPasswordRoute,
   resetPasswordRoute,
+  verifyEmailRoute,
   appRoute.addChildren([
     appIndexRoute,
     calendarRoute,
