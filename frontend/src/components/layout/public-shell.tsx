@@ -1,5 +1,6 @@
 import { Link, Outlet, useParams, useRouterState } from '@tanstack/react-router'
 import { CalendarDays, Clock, LogIn, Mail } from 'lucide-react'
+import { LanguageSwitcher } from '../../features/theme/language-switcher'
 import { ThemeSwitcher } from '../../features/theme/theme-switcher'
 import { usePublicWorkspaceProfileQuery } from '../../lib/api'
 import { cn } from '../../lib/utils'
@@ -28,8 +29,11 @@ export function PublicShell() {
                 <div className="truncate text-sm text-muted-foreground">Public calendar</div>
               </div>
             </Link>
-            <div className="w-44 shrink-0 md:hidden">
-              <ThemeSwitcher />
+            <div className="flex shrink-0 items-center gap-2 md:hidden">
+              <LanguageSwitcher />
+              <div className="w-36">
+                <ThemeSwitcher />
+              </div>
             </div>
           </div>
 
@@ -60,6 +64,7 @@ export function PublicShell() {
               <LogIn className="h-4 w-4" aria-hidden />
               Login
             </Link>
+            <LanguageSwitcher />
             <div className="w-48">
               <ThemeSwitcher />
             </div>

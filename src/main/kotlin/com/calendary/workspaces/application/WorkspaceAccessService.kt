@@ -35,7 +35,7 @@ class WorkspaceAccessService(
 
     fun canWrite(workspaceId: UUID, userId: UUID): Boolean =
         memberships.findByWorkspaceIdAndUserId(workspaceId, userId)
-            .map { it.accessLevel != WorkspaceAccessLevel.READ }.isPresent
+            .map { it.accessLevel != WorkspaceAccessLevel.READ }.orElse(false)
 
     // The owner sees every resource in their own workspace. Anyone else with a membership row
     // (an invited collaborator) only sees what's explicitly shared with them — see

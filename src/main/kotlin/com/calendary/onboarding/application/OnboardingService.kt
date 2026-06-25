@@ -52,7 +52,7 @@ class OnboardingService(
 			UserAccount(
 				email = email,
 				passwordHash = passwordEncoder.encode(command.password) ?: error("Password encoder returned null."),
-				status = UserStatus.PASSWORD_CHANGE_REQUIRED,
+				status = UserStatus.ACTIVE,
 				role = UserRole.SUPER_ADMIN,
 			),
 		)
@@ -139,7 +139,7 @@ class OnboardingService(
 			UserAccount(
 				email = invitation.email,
 				passwordHash = passwordEncoder.encode(command.password) ?: error("Password encoder returned null."),
-				status = UserStatus.PASSWORD_CHANGE_REQUIRED,
+				status = UserStatus.ACTIVE,
 				role = UserRole.COLLABORATOR,
 			),
 		)
