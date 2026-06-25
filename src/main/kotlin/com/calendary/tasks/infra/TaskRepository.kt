@@ -9,4 +9,6 @@ interface TaskRepository : JpaRepository<Task, UUID> {
 	fun findByIdAndWorkspaceId(id: UUID, workspaceId: UUID): Optional<Task>
 
 	fun findByWorkspaceIdOrderByCreatedAtDesc(workspaceId: UUID): List<Task>
+
+	fun findByProjectIdOrEpicId(projectId: UUID, epicId: UUID): List<Task>
 }

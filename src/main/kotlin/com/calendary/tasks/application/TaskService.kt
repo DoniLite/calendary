@@ -11,6 +11,9 @@ import com.calendary.notifications.domain.NotificationType
 import com.calendary.projects.domain.ProjectType
 import com.calendary.projects.infra.ProjectRepository
 import com.calendary.resources.application.ResourceAccessService
+import com.calendary.attachments.infra.AttachmentRepository
+import com.calendary.collaboration.infra.ResourceShareRepository
+import com.calendary.notifications.infra.NotificationRepository
 import com.calendary.resources.domain.ResourceType
 import com.calendary.tasks.domain.Task
 import com.calendary.tasks.domain.TaskAssignee
@@ -35,6 +38,9 @@ class TaskService(
 	private val workspaceAccess: WorkspaceAccessService,
 	private val resourceAccess: ResourceAccessService,
 	private val notifications: NotificationService,
+	private val attachments: AttachmentRepository,
+	private val shares: ResourceShareRepository,
+	private val notificationRepo: NotificationRepository,
 ) {
 	@Transactional
 	fun create(command: CreateTaskCommand): TaskWithSchedule {
@@ -250,6 +256,9 @@ class TaskService(
 		val task = tasks.findByIdAndWorkspaceId(taskId, workspaceId)
 			.orElseThrow { IllegalArgumentException("Task not found.") }
 		resourceAccess.requireWrite(ResourceType.TASK, task.id, userId)
+		attachments.deleteByResourceTypeAndResourceId(ResourceType.TASK, task.id)
+		shares.deleteByResourceTypeAndResourceId(ResourceType.TASK, task.id)
+		notificationRepo.deleteByResourceId(task.id)
 		calendarBlocks.findBySourceTypeAndSourceId(CalendarBlockSourceType.TASK, task.id)
 			.ifPresent { calendarBlocks.delete(it) }
 		tasks.delete(task)

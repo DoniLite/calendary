@@ -12,6 +12,9 @@ import com.calendary.events.infra.EventRepository
 import com.calendary.notifications.application.CreateNotificationCommand
 import com.calendary.notifications.application.NotificationService
 import com.calendary.notifications.domain.NotificationType
+import com.calendary.attachments.infra.AttachmentRepository
+import com.calendary.collaboration.infra.ResourceShareRepository
+import com.calendary.notifications.infra.NotificationRepository
 import com.calendary.resources.application.ResourceAccessService
 import com.calendary.resources.domain.ResourceType
 import com.calendary.users.domain.UserAccount
@@ -31,6 +34,9 @@ class EventService(
 	private val workspaceAccess: WorkspaceAccessService,
 	private val resourceAccess: ResourceAccessService,
 	private val notifications: NotificationService,
+	private val attachments: AttachmentRepository,
+	private val shares: ResourceShareRepository,
+	private val notificationRepo: NotificationRepository,
 ) {
 	@Transactional
 	fun create(command: CreateEventCommand): Event {
@@ -160,6 +166,9 @@ class EventService(
 		val event = events.findFirstByIdAndWorkspaceId(eventId, workspaceId)
 			.orElseThrow { IllegalArgumentException("Event not found.") }
 		resourceAccess.requireWrite(ResourceType.EVENT, event.id, userId)
+		attachments.deleteByResourceTypeAndResourceId(ResourceType.EVENT, event.id)
+		shares.deleteByResourceTypeAndResourceId(ResourceType.EVENT, event.id)
+		notificationRepo.deleteByResourceId(event.id)
 		calendarBlocks.findBySourceTypeAndSourceId(CalendarBlockSourceType.EVENT, event.id)
 			.ifPresent { calendarBlocks.delete(it) }
 		events.delete(event)

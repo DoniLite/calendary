@@ -701,7 +701,22 @@ export function useResourceMutations(workspaceId?: string) {
     onSuccess: invalidateWorkspace,
   })
 
-  return { createTask, updateTask, updateTaskStatus, createProject, updateProject, createEvent, updateEvent }
+  const deleteTask = useMutation({
+    mutationFn: (id: string) => apiDelete(`/api/workspaces/${requireWorkspace()}/tasks/${id}`),
+    onSuccess: invalidateWorkspace,
+  })
+
+  const deleteProject = useMutation({
+    mutationFn: (id: string) => apiDelete(`/api/workspaces/${requireWorkspace()}/projects/${id}`),
+    onSuccess: invalidateWorkspace,
+  })
+
+  const deleteEvent = useMutation({
+    mutationFn: (id: string) => apiDelete(`/api/workspaces/${requireWorkspace()}/events/${id}`),
+    onSuccess: invalidateWorkspace,
+  })
+
+  return { createTask, updateTask, updateTaskStatus, deleteTask, createProject, updateProject, deleteProject, createEvent, updateEvent, deleteEvent }
 }
 
 export function useWorkspaceSettingsMutation(workspaceId?: string) {

@@ -20,6 +20,8 @@ interface CalendarBlockRepository : JpaRepository<CalendarBlock, UUID> {
 
 	fun findBySourceTypeAndSourceIdIn(sourceType: CalendarBlockSourceType, sourceIds: Collection<UUID>): List<CalendarBlock>
 
+	fun deleteBySourceTypeAndSourceIdIn(sourceType: CalendarBlockSourceType, sourceIds: Collection<UUID>)
+
 	fun existsByWorkspaceIdAndStartsAtLessThanAndEndsAtGreaterThanAndBusyIsTrue(
 		workspaceId: UUID,
 		endsBefore: Instant,

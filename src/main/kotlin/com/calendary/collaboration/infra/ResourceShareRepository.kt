@@ -28,4 +28,8 @@ interface ResourceShareRepository : JpaRepository<ResourceShare, UUID> {
 		status: ShareStatus,
 		accessLevel: com.calendary.workspaces.domain.WorkspaceAccessLevel,
 	): Boolean
+
+	fun deleteByResourceTypeAndResourceId(resourceType: ResourceType, resourceId: UUID)
+
+	fun deleteByResourceTypeAndResourceIdIn(resourceType: ResourceType, resourceIds: Collection<UUID>)
 }

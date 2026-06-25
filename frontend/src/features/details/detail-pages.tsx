@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Link, useParams, useRouterState } from '@tanstack/react-router'
-import { ArrowLeft, CalendarClock, CheckSquare2, Edit3, Layers3, Paperclip, Save } from 'lucide-react'
+import { Link, useNavigate, useParams, useRouterState } from '@tanstack/react-router'
+import { ArrowLeft, CalendarClock, CheckSquare2, Edit3, Layers3, Paperclip, Save, Trash2 } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
@@ -155,6 +155,7 @@ function useResourceDraftQuery(kind: ResourceKind, workspaceId: string | undefin
 function ResourceDetail({ kind }: { kind: ResourceKind }) {
   const { activeWorkspace, activeWorkspaceId, apiEnabled } = useWorkspaceSession()
   const pathname = useRouterState({ select: (state) => state.location.pathname })
+  const navigate = useNavigate()
   const resourceId = useResourceIdParam(kind)
   const { draft, members, isPending, isError } = useResourceDraftQuery(kind, activeWorkspaceId, resourceId)
   const projectsQuery = useProjectsQuery(activeWorkspaceId, 'PROJECT')
@@ -167,6 +168,16 @@ function ResourceDetail({ kind }: { kind: ResourceKind }) {
   const canWrite = activeWorkspace?.accessLevel !== 'READ'
   const inCollaboratorPortal = pathname.startsWith('/collab')
   const resourceType = resourceTypeFor(kind)
+  const mutations = useResourceMutations(activeWorkspaceId)
+  const [confirmDelete, setConfirmDelete] = useState(false)
+
+  async function handleDelete() {
+    if (!resourceId) return
+    if (kind === 'TASK') await mutations.deleteTask.mutateAsync(resourceId)
+    else if (kind === 'EVENT') await mutations.deleteEvent.mutateAsync(resourceId)
+    else await mutations.deleteProject.mutateAsync(resourceId)
+    await navigate({ to: backTo })
+  }
 
   return (
     <div className="space-y-5">
@@ -186,7 +197,28 @@ function ResourceDetail({ kind }: { kind: ResourceKind }) {
             </div>
           </div>
         </div>
-        {canWrite && draft && <EditLink kind={kind} resourceId={resourceId ?? ''} inCollaboratorPortal={inCollaboratorPortal} />}
+        {canWrite && draft && (
+          <div className="flex shrink-0 items-center gap-2">
+            <EditLink kind={kind} resourceId={resourceId ?? ''} inCollaboratorPortal={inCollaboratorPortal} />
+            {confirmDelete ? (
+              <>
+                <Button
+                  className="h-9 bg-busy text-white hover:bg-busy/90"
+                  onClick={() => void handleDelete()}
+                  disabled={mutations.deleteTask.isPending || mutations.deleteProject.isPending || mutations.deleteEvent.isPending}
+                >
+                  <Trash2 className="h-4 w-4" aria-hidden />
+                  Confirm delete
+                </Button>
+                <Button variant="secondary" className="h-9" onClick={() => setConfirmDelete(false)}>Cancel</Button>
+              </>
+            ) : (
+              <Button variant="ghost" className="h-9 text-muted-foreground hover:text-busy" onClick={() => setConfirmDelete(true)}>
+                <Trash2 className="h-4 w-4" aria-hidden />
+              </Button>
+            )}
+          </div>
+        )}
       </div>
 
       {!apiEnabled && <div className="rounded-md border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">Select a workspace to view this resource.</div>}
