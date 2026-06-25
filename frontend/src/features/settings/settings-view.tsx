@@ -275,6 +275,7 @@ function WorkspaceThemeCard({ workspace }: { workspace?: WorkspaceResponse }) {
 }
 
 function ChangeEmailCard() {
+  const { t } = useTranslation()
   const { user } = useWorkspaceSession()
   const mutation = useChangeEmailMutation()
   const [pendingEmail, setPendingEmail] = useState<string>()
@@ -299,22 +300,22 @@ function ChangeEmailCard() {
       <PanelHeader>
         <PanelTitle className="flex items-center gap-2">
           <Mail className="h-4 w-4 text-muted-foreground" aria-hidden />
-          Change email
+          {t('settings.changeEmail.title')}
         </PanelTitle>
       </PanelHeader>
       <PanelBody>
-        <p className="mb-3 text-sm text-muted-foreground">Current: <span className="font-medium text-foreground">{user?.email}</span></p>
+        <p className="mb-3 text-sm text-muted-foreground">{t('settings.changeEmail.current')} <span className="font-medium text-foreground">{user?.email}</span></p>
         <form className="grid gap-3" onSubmit={handleSubmit(onSubmit)}>
           <label className="grid gap-2">
-            <span className="text-sm font-medium">New email</span>
+            <span className="text-sm font-medium">{t('settings.changeEmail.newEmail')}</span>
             <input className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" type="email" placeholder="new@example.com" {...register('newEmail')} />
             <FieldError message={errors.newEmail?.message} />
           </label>
           {pendingEmail && (
-            <p className="text-sm text-available">Confirmation email sent to <strong>{pendingEmail}</strong>. Click the link to confirm.</p>
+            <p className="text-sm text-available">{t('settings.changeEmail.success', { email: pendingEmail })}</p>
           )}
-          {mutation.isError && <p className="text-sm text-busy">Unable to request email change. Check the address and try again.</p>}
-          <Button className="w-fit" disabled={isSubmitting}>Send confirmation</Button>
+          {mutation.isError && <p className="text-sm text-busy">{t('settings.changeEmail.error')}</p>}
+          <Button className="w-fit" disabled={isSubmitting}>{t('settings.changeEmail.submit')}</Button>
         </form>
       </PanelBody>
     </Panel>
@@ -322,6 +323,7 @@ function ChangeEmailCard() {
 }
 
 function ChangePasswordCard() {
+  const { t } = useTranslation()
   const mutation = useChangePasswordMutation()
   const [success, setSuccess] = useState(false)
   const {
@@ -345,24 +347,24 @@ function ChangePasswordCard() {
       <PanelHeader>
         <PanelTitle className="flex items-center gap-2">
           <KeyRound className="h-4 w-4 text-muted-foreground" aria-hidden />
-          Change password
+          {t('settings.changePassword.title')}
         </PanelTitle>
       </PanelHeader>
       <PanelBody>
         <form className="grid gap-3" onSubmit={handleSubmit(onSubmit)}>
           <label className="grid gap-2">
-            <span className="text-sm font-medium">Current password</span>
+            <span className="text-sm font-medium">{t('settings.changePassword.currentPassword')}</span>
             <input className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" type="password" {...register('currentPassword')} />
             <FieldError message={errors.currentPassword?.message} />
           </label>
           <label className="grid gap-2">
-            <span className="text-sm font-medium">New password</span>
+            <span className="text-sm font-medium">{t('settings.changePassword.newPassword')}</span>
             <input className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" type="password" placeholder="12+ characters" {...register('newPassword')} />
             <FieldError message={errors.newPassword?.message} />
           </label>
-          {success && <p className="text-sm text-available">Password updated successfully.</p>}
-          {mutation.isError && <p className="text-sm text-busy">Current password is incorrect.</p>}
-          <Button className="w-fit" disabled={isSubmitting}>Update password</Button>
+          {success && <p className="text-sm text-available">{t('settings.changePassword.success')}</p>}
+          {mutation.isError && <p className="text-sm text-busy">{t('settings.changePassword.error')}</p>}
+          <Button className="w-fit" disabled={isSubmitting}>{t('settings.changePassword.submit')}</Button>
         </form>
       </PanelBody>
     </Panel>

@@ -69,7 +69,7 @@ export function LoginPage() {
         <Button disabled={isSubmitting}>{isSubmitting ? t('auth.login.submitting') : t('auth.login.submit')}</Button>
         <div className="flex items-center justify-between text-sm">
           <Link to="/forgot-password" className="text-muted-foreground hover:text-foreground">
-            Forgot password?
+            {t('auth.login.forgotPassword')}
           </Link>
           <Link to="/" className="text-muted-foreground hover:text-foreground">
             {t('auth.login.backToPublicCalendar')}
@@ -260,6 +260,7 @@ export function ChangePasswordPage() {
 }
 
 export function ForgotPasswordPage() {
+  const { t } = useTranslation()
   const [sent, setSent] = useState(false)
   const mutation = useForgotPasswordMutation()
   const {
@@ -274,23 +275,23 @@ export function ForgotPasswordPage() {
   }
 
   return (
-    <AuthFrame title="Forgot password" subtitle="We'll send you a reset link.">
+    <AuthFrame title={t('auth.forgotPassword.title')} subtitle={t('auth.forgotPassword.subtitle')}>
       {sent ? (
         <div className="space-y-4">
           <div className="rounded-md border border-available/30 bg-available/10 p-4 text-sm">
-            If an account with that email exists, a reset link has been sent. Check your inbox.
+            {t('auth.forgotPassword.success')}
           </div>
-          <Link to="/login" className="block text-center text-sm text-muted-foreground hover:text-foreground">Back to login</Link>
+          <Link to="/login" className="block text-center text-sm text-muted-foreground hover:text-foreground">{t('auth.forgotPassword.backToLogin')}</Link>
         </div>
       ) : (
         <form className="grid gap-4" onSubmit={handleSubmit(onSubmit)}>
-          <Field icon={Mail} label="Email">
+          <Field icon={Mail} label={t('auth.email')}>
             <input className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" type="email" placeholder="you@example.com" autoFocus {...register('email')} />
             <FieldError message={errors.email?.message} />
           </Field>
-          {mutation.isError && <p className="rounded-md border border-busy/30 bg-busy/10 px-3 py-2 text-sm">Unable to process request. Try again later.</p>}
-          <Button disabled={isSubmitting}>Send reset link</Button>
-          <Link to="/login" className="text-center text-sm text-muted-foreground hover:text-foreground">Back to login</Link>
+          {mutation.isError && <p className="rounded-md border border-busy/30 bg-busy/10 px-3 py-2 text-sm">{t('auth.forgotPassword.error')}</p>}
+          <Button disabled={isSubmitting}>{isSubmitting ? t('auth.forgotPassword.submitting') : t('auth.forgotPassword.submit')}</Button>
+          <Link to="/login" className="text-center text-sm text-muted-foreground hover:text-foreground">{t('auth.forgotPassword.backToLogin')}</Link>
         </form>
       )}
     </AuthFrame>
@@ -298,6 +299,7 @@ export function ForgotPasswordPage() {
 }
 
 export function ResetPasswordPage() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const token = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('token') ?? '' : ''
   const [done, setDone] = useState(false)
@@ -316,27 +318,27 @@ export function ResetPasswordPage() {
 
   if (!token) {
     return (
-      <AuthFrame title="Invalid link" subtitle="This reset link is missing or malformed.">
-        <Link to="/forgot-password" className="block text-center text-sm text-muted-foreground hover:text-foreground">Request a new link</Link>
+      <AuthFrame title={t('auth.resetPassword.missingTitle')} subtitle={t('auth.resetPassword.missingSubtitle')}>
+        <Link to="/forgot-password" className="block text-center text-sm text-muted-foreground hover:text-foreground">{t('auth.resetPassword.requestNew')}</Link>
       </AuthFrame>
     )
   }
 
   return (
-    <AuthFrame title="Reset password" subtitle="Choose a new password for your account.">
+    <AuthFrame title={t('auth.resetPassword.title')} subtitle={t('auth.resetPassword.subtitle')}>
       {done ? (
         <div className="rounded-md border border-available/30 bg-available/10 p-4 text-sm">
-          Password updated. Redirecting to login…
+          {t('auth.resetPassword.success')}
         </div>
       ) : (
         <form className="grid gap-4" onSubmit={handleSubmit(onSubmit)}>
-          <Field icon={KeyRound} label="New password">
+          <Field icon={KeyRound} label={t('auth.resetPassword.newPassword')}>
             <input className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" type="password" placeholder="12+ characters" autoFocus {...register('newPassword')} />
             <FieldError message={errors.newPassword?.message} />
           </Field>
-          {mutation.isError && <p className="rounded-md border border-busy/30 bg-busy/10 px-3 py-2 text-sm">Invalid or expired link. Request a new one.</p>}
-          <Button disabled={isSubmitting}>Set new password</Button>
-          <Link to="/forgot-password" className="text-center text-sm text-muted-foreground hover:text-foreground">Request a new link</Link>
+          {mutation.isError && <p className="rounded-md border border-busy/30 bg-busy/10 px-3 py-2 text-sm">{t('auth.resetPassword.error')}</p>}
+          <Button disabled={isSubmitting}>{isSubmitting ? t('auth.resetPassword.submitting') : t('auth.resetPassword.submit')}</Button>
+          <Link to="/forgot-password" className="text-center text-sm text-muted-foreground hover:text-foreground">{t('auth.resetPassword.requestNew')}</Link>
         </form>
       )}
     </AuthFrame>
@@ -344,6 +346,7 @@ export function ResetPasswordPage() {
 }
 
 export function VerifyEmailPage() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const token = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('token') ?? '' : ''
   const mutation = useVerifyEmailMutation()
@@ -357,7 +360,7 @@ export function VerifyEmailPage() {
         setDone(true)
         setTimeout(() => { void navigate({ to: '/login' }) }, 3000)
       },
-      onError: () => setError('This verification link is invalid or has expired.'),
+      onError: () => setError(t('auth.verifyEmail.error')),
     })
   // Run once on mount — mutation ref is stable.
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -365,27 +368,27 @@ export function VerifyEmailPage() {
 
   if (!token) {
     return (
-      <AuthFrame title="Invalid link" subtitle="This verification link is missing or malformed.">
-        <Link to="/login" className="block text-center text-sm text-muted-foreground hover:text-foreground">Back to login</Link>
+      <AuthFrame title={t('auth.verifyEmail.missingTitle')} subtitle={t('auth.verifyEmail.missingSubtitle')}>
+        <Link to="/login" className="block text-center text-sm text-muted-foreground hover:text-foreground">{t('auth.verifyEmail.backToLogin')}</Link>
       </AuthFrame>
     )
   }
 
   return (
-    <AuthFrame title="Email verification" subtitle="Confirming your new email address.">
+    <AuthFrame title={t('auth.verifyEmail.title')} subtitle={t('auth.verifyEmail.subtitle')}>
       {done ? (
         <div className="space-y-3">
           <div className="rounded-md border border-available/30 bg-available/10 p-4 text-sm">
-            Email address confirmed. Redirecting to login…
+            {t('auth.verifyEmail.success')}
           </div>
         </div>
       ) : error ? (
         <div className="space-y-3">
           <div className="rounded-md border border-busy/30 bg-busy/10 p-4 text-sm">{error}</div>
-          <Link to="/login" className="block text-center text-sm text-muted-foreground hover:text-foreground">Back to login</Link>
+          <Link to="/login" className="block text-center text-sm text-muted-foreground hover:text-foreground">{t('auth.verifyEmail.backToLogin')}</Link>
         </div>
       ) : (
-        <div className="py-4 text-center text-sm text-muted-foreground">Verifying…</div>
+        <div className="py-4 text-center text-sm text-muted-foreground">{t('auth.verifyEmail.verifying')}</div>
       )}
     </AuthFrame>
   )

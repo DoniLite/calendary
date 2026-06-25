@@ -2,20 +2,16 @@ import { DndContext, useDraggable, useDroppable, type DragEndEvent } from '@dnd-
 import { CSS } from '@dnd-kit/utilities'
 import { Link, useRouterState } from '@tanstack/react-router'
 import { GripVertical, Plus } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { Badge } from '../../components/ui/badge'
 import { useWorkspaceSession } from '../auth/workspace-session'
 import { useResourceMutations, useTasksQuery, type TaskResponse } from '../../lib/api'
 import type { TaskItem, TaskStatus } from '../../lib/demo-data'
 
-const columns: Array<{ status: TaskStatus; label: string }> = [
-  { status: 'BACKLOG', label: 'Backlog' },
-  { status: 'TODO', label: 'Todo' },
-  { status: 'IN_PROGRESS', label: 'Progress' },
-  { status: 'REVIEW', label: 'Review' },
-  { status: 'DONE', label: 'Done' },
-]
+const columnStatuses: TaskStatus[] = ['BACKLOG', 'TODO', 'IN_PROGRESS', 'REVIEW', 'DONE']
 
 export function TaskBoardView() {
+  const { t } = useTranslation()
   const { activeWorkspace, activeWorkspaceId, apiEnabled } = useWorkspaceSession()
   const canWrite = activeWorkspace?.accessLevel !== 'READ'
   const inCollaboratorPortal = useRouterState({ select: (state) => state.location.pathname.startsWith('/collab') })
@@ -29,7 +25,7 @@ export function TaskBoardView() {
     }
     const taskId = String(event.active.id)
     const targetStatus = event.over?.id as TaskStatus | undefined
-    if (!targetStatus || !columns.some((column) => column.status === targetStatus)) {
+    if (!targetStatus || !columnStatuses.includes(targetStatus)) {
       return
     }
     const task = visibleTasks.find((item) => item.id === taskId)
@@ -43,45 +39,45 @@ export function TaskBoardView() {
     <div className="space-y-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold">Tasks</h1>
-          <p className="text-sm text-muted-foreground">Workspace tasks loaded from Calendary API. Drag a card between columns to update its status.</p>
+          <h1 className="text-2xl font-semibold">{t('tasks.title')}</h1>
+          <p className="text-sm text-muted-foreground">{t('tasks.subtitle')}</p>
         </div>
         {canWrite && (
           inCollaboratorPortal ? (
             <Link to="/collab/tasks/new" className="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
               <Plus className="h-4 w-4" aria-hidden />
-              Task
+              {t('tasks.newTask')}
             </Link>
           ) : (
             <Link to="/app/tasks/new" className="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
               <Plus className="h-4 w-4" aria-hidden />
-              Task
+              {t('tasks.newTask')}
             </Link>
           )
         )}
       </div>
 
-      {!apiEnabled && <div className="rounded-md border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">Select a workspace to load its tasks.</div>}
-      {apiEnabled && tasksQuery.isPending && <div className="rounded-md border bg-card px-4 py-3 text-sm text-muted-foreground">Loading tasks from backend...</div>}
+      {!apiEnabled && <div className="rounded-md border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">{t('tasks.noWorkspace')}</div>}
+      {apiEnabled && tasksQuery.isPending && <div className="rounded-md border bg-card px-4 py-3 text-sm text-muted-foreground">{t('tasks.loading')}</div>}
       {apiEnabled && tasksQuery.isError && (
         <div className="rounded-md border border-busy/30 bg-busy/10 px-4 py-3 text-sm text-foreground">
-          Unable to load backend tasks. Check your session and workspace id.
+          {t('tasks.error')}
         </div>
       )}
 
       {apiEnabled && (
         <DndContext onDragEnd={handleDragEnd}>
-          <section className="grid gap-4 xl:grid-cols-5">
-            {columns.map((column) => {
-              const columnTasks = visibleTasks.filter((task) => task.status === column.status)
-              return <TaskColumn key={column.status} status={column.status} label={column.label} tasks={columnTasks} canWrite={canWrite} inCollaboratorPortal={inCollaboratorPortal} />
+          <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+            {columnStatuses.map((status) => {
+              const columnTasks = visibleTasks.filter((task) => task.status === status)
+              return <TaskColumn key={status} status={status} label={t(`tasks.columns.${status}`)} tasks={columnTasks} canWrite={canWrite} inCollaboratorPortal={inCollaboratorPortal} />
             })}
           </section>
         </DndContext>
       )}
       {apiEnabled && !visibleTasks.length && !tasksQuery.isPending && (
         <div className="rounded-md border bg-muted/40 px-4 py-6 text-center text-sm text-muted-foreground">
-          No tasks in this workspace yet.
+          {t('tasks.empty')}
         </div>
       )}
     </div>
