@@ -2,13 +2,16 @@ package com.calendary.auth.api
 
 import com.calendary.auth.api.dto.AuthenticatedUserResponse
 import com.calendary.auth.api.dto.ChangePasswordRequest
+import com.calendary.auth.api.dto.ForgotPasswordRequest
 import com.calendary.auth.api.dto.LoginRequest
+import com.calendary.auth.api.dto.ResetPasswordRequest
 import com.calendary.auth.api.dto.toAuthenticatedResponse
 import com.calendary.auth.application.AuthService
 import com.calendary.auth.application.AuthSessionService
 import com.calendary.auth.application.LoginCommand
 import com.calendary.users.application.AccountSecurityService
 import com.calendary.users.application.ChangePasswordCommand
+import com.calendary.users.application.ResetPasswordCommand
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpSession
 import jakarta.validation.Valid
@@ -62,5 +65,17 @@ class AuthController(
 			),
 		)
 		return sessions.currentUser(httpRequest.getSession(false)).toAuthenticatedResponse()
+	}
+
+	@PostMapping("/forgot-password")
+	@ResponseStatus(HttpStatus.NO_CONTENT)
+	fun forgotPassword(@Valid @RequestBody request: ForgotPasswordRequest) {
+		accountSecurity.requestPasswordReset(request.email)
+	}
+
+	@PostMapping("/reset-password")
+	@ResponseStatus(HttpStatus.NO_CONTENT)
+	fun resetPassword(@Valid @RequestBody request: ResetPasswordRequest) {
+		accountSecurity.resetPassword(ResetPasswordCommand(rawToken = request.token, newPassword = request.newPassword))
 	}
 }

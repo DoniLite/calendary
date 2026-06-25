@@ -608,6 +608,18 @@ export function useCollaborationMutations() {
   }
 }
 
+export function useForgotPasswordMutation() {
+  return useMutation({ mutationFn: (email: string) => apiPost<void>('/api/auth/forgot-password', { email }) })
+}
+
+export function useResetPasswordMutation() {
+  return useMutation({ mutationFn: ({ token, newPassword }: { token: string; newPassword: string }) => apiPost<void>('/api/auth/reset-password', { token, newPassword }) })
+}
+
+export function useChangePasswordMutation() {
+  return useMutation({ mutationFn: (values: { currentPassword: string; newPassword: string }) => apiPatch<void>('/api/auth/password', values) })
+}
+
 export function usePublicBookingMutation(workspaceId?: string) {
   const queryClient = useQueryClient()
   return useMutation({

@@ -298,7 +298,7 @@ function ResourceDetail({ kind }: { kind: ResourceKind }) {
               <PanelHeader>
                 <PanelTitle>Collaboration</PanelTitle>
               </PanelHeader>
-              <CollaborationPanel resourceType={resourceType} resourceId={resourceId} canWrite={canWrite} />
+              <CollaborationPanel resourceType={resourceType} resourceId={resourceId} canWrite={canWrite} parentProjectId={kind === 'TASK' ? (draft?.projectId ?? null) : null} />
             </Panel>
           </aside>
         </section>
@@ -350,7 +350,7 @@ function AttachmentPanel({ resourceType, resourceId, canWrite }: { resourceType:
   )
 }
 
-function CollaborationPanel({ resourceType, resourceId, canWrite }: { resourceType: ResourceType; resourceId?: string; canWrite: boolean }) {
+function CollaborationPanel({ resourceType, resourceId, canWrite, parentProjectId }: { resourceType: ResourceType; resourceId?: string; canWrite: boolean; parentProjectId?: string | null }) {
   const { activeWorkspaceId, user } = useWorkspaceSession()
   const membersQuery = useWorkspaceMembersQuery(activeWorkspaceId)
   // Sharing targets an existing account by email, so the candidate list is restricted to people
@@ -370,6 +370,18 @@ function CollaborationPanel({ resourceType, resourceId, canWrite }: { resourceTy
     resolver: zodResolver(proposeCollaborationSchema),
     defaultValues: { accessLevel: 'READ', message: '' },
   })
+
+  // Tasks belonging to a project inherit access through the project share — direct task
+  // sharing would bypass the intended granularity and confuse the access model.
+  if (resourceType === 'TASK' && parentProjectId) {
+    return (
+      <PanelBody>
+        <p className="text-sm text-muted-foreground">
+          This task belongs to a project. Share the <strong>project</strong> to give a collaborator access to all its tasks.
+        </p>
+      </PanelBody>
+    )
+  }
 
   function onSubmit(values: ProposeCollaborationFormValues) {
     if (!resourceId || !recipientEmail) return

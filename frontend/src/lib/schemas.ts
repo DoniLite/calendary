@@ -64,6 +64,16 @@ export const resourceFormSchema = z.object({
 })
 export type ResourceFormValues = z.infer<typeof resourceFormSchema>
 
+export const forgotPasswordSchema = z.object({
+  email: z.string().min(1, 'Email is required').email('Enter a valid email address'),
+})
+export type ForgotPasswordFormValues = z.infer<typeof forgotPasswordSchema>
+
+export const resetPasswordSchema = z.object({
+  newPassword: z.string().min(12, 'Password must be at least 12 characters'),
+})
+export type ResetPasswordFormValues = z.infer<typeof resetPasswordSchema>
+
 export const bookingRequestSchema = z.object({
   name: z.string().min(1, 'Name is required'),
   email: z.string().min(1, 'Email is required').email('Enter a valid email address'),

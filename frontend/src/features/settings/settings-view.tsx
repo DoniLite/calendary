@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Image, Paintbrush, Server, UserPlus } from 'lucide-react'
+import { Image, KeyRound, Paintbrush, Server, UserPlus } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
@@ -11,13 +11,14 @@ import { useTheme } from '../theme/theme-provider'
 import { themes } from '../theme/themes'
 import {
   apiPost,
+  useChangePasswordMutation,
   useWorkspaceIconMutation,
   useWorkspaceSettingsMutation,
   workspaceIconUrl,
   type CreatedInvitationResponse,
   type WorkspaceResponse,
 } from '../../lib/api'
-import { inviteCollaboratorSchema, workspaceSettingsSchema, type InviteCollaboratorFormInput, type InviteCollaboratorFormValues, type WorkspaceSettingsFormValues } from '../../lib/schemas'
+import { changePasswordSchema, inviteCollaboratorSchema, workspaceSettingsSchema, type ChangePasswordFormValues, type InviteCollaboratorFormInput, type InviteCollaboratorFormValues, type WorkspaceSettingsFormValues } from '../../lib/schemas'
 
 const fallbackTimezones = ['UTC', 'Europe/Paris', 'Europe/London', 'Africa/Abidjan', 'America/New_York', 'America/Los_Angeles', 'Asia/Tokyo', 'Asia/Dubai']
 
@@ -44,6 +45,7 @@ export function SettingsView() {
         <WorkspaceIconCard workspace={activeWorkspace} />
         <WorkspaceThemeCard workspace={activeWorkspace} />
       </div>
+      <ChangePasswordCard />
     </div>
   )
 }
@@ -263,6 +265,54 @@ function WorkspaceThemeCard({ workspace }: { workspace?: WorkspaceResponse }) {
             </button>
           ))}
         </div>
+      </PanelBody>
+    </Panel>
+  )
+}
+
+function ChangePasswordCard() {
+  const mutation = useChangePasswordMutation()
+  const [success, setSuccess] = useState(false)
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors, isSubmitting },
+  } = useForm<ChangePasswordFormValues>({
+    resolver: zodResolver(changePasswordSchema),
+    defaultValues: { currentPassword: '', newPassword: '' },
+  })
+
+  async function onSubmit(values: ChangePasswordFormValues) {
+    await mutation.mutateAsync(values)
+    setSuccess(true)
+    reset()
+  }
+
+  return (
+    <Panel>
+      <PanelHeader>
+        <PanelTitle className="flex items-center gap-2">
+          <KeyRound className="h-4 w-4 text-muted-foreground" aria-hidden />
+          Change password
+        </PanelTitle>
+      </PanelHeader>
+      <PanelBody>
+        <form className="grid gap-3" onSubmit={handleSubmit(onSubmit)}>
+          <label className="grid gap-2">
+            <span className="text-sm font-medium">Current password</span>
+            <input className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" type="password" {...register('currentPassword')} />
+            <FieldError message={errors.currentPassword?.message} />
+          </label>
+          <label className="grid gap-2">
+            <span className="text-sm font-medium">New password</span>
+            <input className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" type="password" placeholder="12+ characters" {...register('newPassword')} />
+            <FieldError message={errors.newPassword?.message} />
+          </label>
+          {success && <p className="text-sm text-available">Password updated successfully.</p>}
+          {mutation.isError && <p className="text-sm text-busy">Current password is incorrect.</p>}
+          <Button className="w-fit" disabled={isSubmitting}>Update password</Button>
+        </form>
       </PanelBody>
     </Panel>
   )

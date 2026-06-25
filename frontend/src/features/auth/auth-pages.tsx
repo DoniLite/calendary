@@ -8,17 +8,21 @@ import { Link, useNavigate } from '@tanstack/react-router'
 import { Button } from '../../components/ui/button'
 import { FieldError } from '../../components/ui/form-field'
 import { Panel, PanelBody, PanelHeader, PanelTitle } from '../../components/ui/panel'
-import { apiPatch, apiPost, fetchDefaultPublicProfile, publicWorkspaceIconUrl, type AuthenticatedUserResponse } from '../../lib/api'
+import { apiPatch, apiPost, fetchDefaultPublicProfile, publicWorkspaceIconUrl, useForgotPasswordMutation, useResetPasswordMutation, type AuthenticatedUserResponse } from '../../lib/api'
 import { useQuery } from '@tanstack/react-query'
 import {
   acceptInvitationSchema,
   bootstrapSchema,
   changePasswordSchema,
+  forgotPasswordSchema,
   loginSchema,
+  resetPasswordSchema,
   type AcceptInvitationFormValues,
   type BootstrapFormValues,
   type ChangePasswordFormValues,
+  type ForgotPasswordFormValues,
   type LoginFormValues,
+  type ResetPasswordFormValues,
 } from '../../lib/schemas'
 import { useWorkspaceSession } from './workspace-session'
 
@@ -63,9 +67,14 @@ export function LoginPage() {
         </Field>
         {error && <p className="rounded-md border border-busy/30 bg-busy/10 px-3 py-2 text-sm">{error}</p>}
         <Button disabled={isSubmitting}>{isSubmitting ? t('auth.login.submitting') : t('auth.login.submit')}</Button>
-        <Link to="/" className="text-center text-sm text-muted-foreground hover:text-foreground">
-          {t('auth.login.backToPublicCalendar')}
-        </Link>
+        <div className="flex items-center justify-between text-sm">
+          <Link to="/forgot-password" className="text-muted-foreground hover:text-foreground">
+            Forgot password?
+          </Link>
+          <Link to="/" className="text-muted-foreground hover:text-foreground">
+            {t('auth.login.backToPublicCalendar')}
+          </Link>
+        </div>
       </form>
     </AuthFrame>
   )
@@ -246,6 +255,90 @@ export function ChangePasswordPage() {
         {error && <p className="rounded-md border border-busy/30 bg-busy/10 px-3 py-2 text-sm">{error}</p>}
         <Button disabled={isSubmitting || isLoading}>{isSubmitting ? t('auth.changePassword.submitting') : t('auth.changePassword.submit')}</Button>
       </form>
+    </AuthFrame>
+  )
+}
+
+export function ForgotPasswordPage() {
+  const [sent, setSent] = useState(false)
+  const mutation = useForgotPasswordMutation()
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<ForgotPasswordFormValues>({ resolver: zodResolver(forgotPasswordSchema), defaultValues: { email: '' } })
+
+  async function onSubmit(values: ForgotPasswordFormValues) {
+    await mutation.mutateAsync(values.email)
+    setSent(true)
+  }
+
+  return (
+    <AuthFrame title="Forgot password" subtitle="We'll send you a reset link.">
+      {sent ? (
+        <div className="space-y-4">
+          <div className="rounded-md border border-available/30 bg-available/10 p-4 text-sm">
+            If an account with that email exists, a reset link has been sent. Check your inbox.
+          </div>
+          <Link to="/login" className="block text-center text-sm text-muted-foreground hover:text-foreground">Back to login</Link>
+        </div>
+      ) : (
+        <form className="grid gap-4" onSubmit={handleSubmit(onSubmit)}>
+          <Field icon={Mail} label="Email">
+            <input className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" type="email" placeholder="you@example.com" autoFocus {...register('email')} />
+            <FieldError message={errors.email?.message} />
+          </Field>
+          {mutation.isError && <p className="rounded-md border border-busy/30 bg-busy/10 px-3 py-2 text-sm">Unable to process request. Try again later.</p>}
+          <Button disabled={isSubmitting}>Send reset link</Button>
+          <Link to="/login" className="text-center text-sm text-muted-foreground hover:text-foreground">Back to login</Link>
+        </form>
+      )}
+    </AuthFrame>
+  )
+}
+
+export function ResetPasswordPage() {
+  const navigate = useNavigate()
+  const token = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('token') ?? '' : ''
+  const [done, setDone] = useState(false)
+  const mutation = useResetPasswordMutation()
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<ResetPasswordFormValues>({ resolver: zodResolver(resetPasswordSchema), defaultValues: { newPassword: '' } })
+
+  async function onSubmit(values: ResetPasswordFormValues) {
+    await mutation.mutateAsync({ token, newPassword: values.newPassword })
+    setDone(true)
+    setTimeout(() => { void navigate({ to: '/login' }) }, 2000)
+  }
+
+  if (!token) {
+    return (
+      <AuthFrame title="Invalid link" subtitle="This reset link is missing or malformed.">
+        <Link to="/forgot-password" className="block text-center text-sm text-muted-foreground hover:text-foreground">Request a new link</Link>
+      </AuthFrame>
+    )
+  }
+
+  return (
+    <AuthFrame title="Reset password" subtitle="Choose a new password for your account.">
+      {done ? (
+        <div className="rounded-md border border-available/30 bg-available/10 p-4 text-sm">
+          Password updated. Redirecting to login…
+        </div>
+      ) : (
+        <form className="grid gap-4" onSubmit={handleSubmit(onSubmit)}>
+          <Field icon={KeyRound} label="New password">
+            <input className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" type="password" placeholder="12+ characters" autoFocus {...register('newPassword')} />
+            <FieldError message={errors.newPassword?.message} />
+          </Field>
+          {mutation.isError && <p className="rounded-md border border-busy/30 bg-busy/10 px-3 py-2 text-sm">Invalid or expired link. Request a new one.</p>}
+          <Button disabled={isSubmitting}>Set new password</Button>
+          <Link to="/forgot-password" className="text-center text-sm text-muted-foreground hover:text-foreground">Request a new link</Link>
+        </form>
+      )}
     </AuthFrame>
   )
 }
