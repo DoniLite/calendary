@@ -60,6 +60,8 @@ export const resourceFormSchema = z.object({
   startsAt: z.string().min(1, 'Start time is required'),
   endsAt: z.string().min(1, 'End time is required'),
   priority: z.string(),
+  dueAt: z.string().optional(),
+  projectStartsAt: z.string().optional(),
 })
 export type ResourceFormValues = z.infer<typeof resourceFormSchema>
 

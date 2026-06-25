@@ -63,7 +63,7 @@ class AttachmentService(
 			.orElseThrow { IllegalArgumentException("Attachment not found.") }
 		return AttachmentDownload(
 			attachment = attachment,
-			url = storage.downloadUrl(attachment.storageKey),
+			url = storage.downloadUrl(attachment.storageKey, attachment.originalFilename, attachment.contentType),
 		)
 	}
 
