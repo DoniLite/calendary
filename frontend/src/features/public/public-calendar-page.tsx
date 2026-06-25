@@ -1,16 +1,15 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { CalendarPlus, CheckCircle2, ChevronLeft, ChevronRight, Clock, Globe2, Lock, Mail, MessageSquare, User } from 'lucide-react'
+import { CalendarDays, CalendarPlus, CheckCircle2, ChevronLeft, ChevronRight, Clock, Globe2, Lock, Mail, MessageSquare, Timer, User } from 'lucide-react'
 import { Link, useParams } from '@tanstack/react-router'
 import { useEffect, useMemo, useState, type ComponentType, type CSSProperties, type ReactNode } from 'react'
 import { useForm } from 'react-hook-form'
 import { Badge } from '../../components/ui/badge'
 import { Button } from '../../components/ui/button'
-import { Combobox } from '../../components/ui/combobox'
 import { FieldError } from '../../components/ui/form-field'
 import { Panel, PanelBody, PanelHeader, PanelTitle } from '../../components/ui/panel'
 import type { CalendarItem } from '../../lib/demo-data'
 import { bookingRequestSchema, type BookingRequestFormValues } from '../../lib/schemas'
-import { dayIndexInTimezone, formatTimeInTimezone } from '../../lib/timezone'
+import { dayIndexInTimezone, formatTimeInTimezone, wallTimeToInstant } from '../../lib/timezone'
 import { usePublicAvailabilityQuery, usePublicBookingMutation, usePublicCalendarItemQuery, usePublicCalendarQuery, usePublicWorkspaceProfileQuery, type CalendarBlockSourceType, type PublicCalendarItemResponse } from '../../lib/api'
 
 const hours = Array.from({ length: 24 }, (_, index) => index)
@@ -28,7 +27,7 @@ export function PublicCalendarPage() {
     () =>
       (publicCalendarQuery.data?.items ?? [])
         .map((item, index) => publicApiItemToCalendarItem(item, index, days, timezone, publicWorkspace.displayName))
-        .filter((item) => item.dayIndex >= 0),
+        .filter((item) => item.dayIndex >= 0 || item.endDayIndex >= 0),
     [publicCalendarQuery.data, days, timezone, publicWorkspace.displayName],
   )
   useEffect(() => {
@@ -459,48 +458,43 @@ export function PublicAvailabilityPage() {
 export function PublicRequestPage() {
   const publicWorkspace = usePublicWorkspaceFromRoute()
   const [sent, setSent] = useState(false)
-  const [slotId, setSlotId] = useState<string>()
-  const start = useMemo(() => startOfWeek(new Date()), [])
-  const availabilityQuery = usePublicAvailabilityQuery(publicWorkspace.workspaceId, start, addDays(start, 7))
   const bookingMutation = usePublicBookingMutation(publicWorkspace.workspaceId)
   const {
     register,
     handleSubmit,
-    watch,
     setValue,
     formState: { errors },
   } = useForm<BookingRequestFormValues>({
     resolver: zodResolver(bookingRequestSchema),
-    defaultValues: { name: '', email: '', timezone: publicWorkspace.defaultTimezone, message: '' },
+    defaultValues: {
+      name: '',
+      email: '',
+      timezone: publicWorkspace.defaultTimezone,
+      date: new Date().toISOString().slice(0, 10),
+      time: '09:00',
+      durationMinutes: 60,
+      message: '',
+    },
   })
-  const timezone = watch('timezone')
-  const slots = availabilityQuery.data?.slots.filter((slot) => slot.available).map((slot, index) => ({
-    id: `slot-${index}`,
-    label: formatSlotLabel(slot.startsAt, timezone),
-    startsAt: slot.startsAt,
-    endsAt: slot.endsAt,
-    available: slot.available,
-  })) ?? []
-  const selectedSlot = slots.find((slot) => slot.id === slotId) ?? slots[0]
   useEffect(() => {
     setValue('timezone', publicWorkspace.defaultTimezone)
   }, [publicWorkspace.defaultTimezone, setValue])
-  useEffect(() => {
-    if (!slotId && slots.length) setSlotId(slots[0].id)
-  }, [slotId, slots])
 
   function onSubmit(values: BookingRequestFormValues) {
-    if (!selectedSlot) return
     if (!publicWorkspace.workspaceId) {
       setSent(true)
       return
     }
+    const [year, month, day] = values.date.split('-').map(Number)
+    const [hour, minute] = values.time.split(':').map(Number)
+    const startsAtDate = wallTimeToInstant({ year, month: month - 1, day }, hour, minute, values.timezone)
+    const endsAtDate = new Date(startsAtDate.getTime() + values.durationMinutes * 60_000)
     bookingMutation.mutate({
       requesterName: values.name,
       requesterEmail: values.email,
       message: values.message,
-      startsAt: selectedSlot.startsAt,
-      endsAt: selectedSlot.endsAt,
+      startsAt: startsAtDate.toISOString(),
+      endsAt: endsAtDate.toISOString(),
       timezone: values.timezone,
     }, { onSuccess: () => setSent(true) })
   }
@@ -509,7 +503,7 @@ export function PublicRequestPage() {
     <div className="mx-auto max-w-2xl space-y-5">
       <div>
         <h1 className="text-3xl font-semibold">Request a booking</h1>
-        <p className="mt-2 text-sm text-muted-foreground">{publicWorkspace.displayName} reviews every request before a Google Meet is created.</p>
+        <p className="mt-2 text-sm text-muted-foreground">{publicWorkspace.displayName} reviews every request before confirming a meeting.</p>
       </div>
       <Panel>
         <PanelHeader>
@@ -520,48 +514,55 @@ export function PublicRequestPage() {
             <div className="rounded-md border border-available/30 bg-available/10 p-4">
               <div className="font-semibold">Request sent</div>
               <p className="mt-2 text-sm text-muted-foreground">
-                If {publicWorkspace.displayName} accepts, you will receive an email with the meeting time and Google Meet link.
+                {publicWorkspace.displayName} will review your request and confirm a time before the meeting is finalised.
               </p>
             </div>
           ) : (
             <form className="grid gap-4" onSubmit={handleSubmit(onSubmit)}>
-              <Field icon={User} label="Name">
-                <input className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" placeholder="Ada Lovelace" {...register('name')} />
-                <FieldError message={errors.name?.message} />
-              </Field>
-              <Field icon={Mail} label="Email">
-                <input className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" type="email" placeholder="ada@example.com" {...register('email')} />
-                <FieldError message={errors.email?.message} />
-              </Field>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field icon={User} label="Name">
+                  <input className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" placeholder="Ada Lovelace" {...register('name')} />
+                  <FieldError message={errors.name?.message} />
+                </Field>
+                <Field icon={Mail} label="Email">
+                  <input className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" type="email" placeholder="ada@example.com" {...register('email')} />
+                  <FieldError message={errors.email?.message} />
+                </Field>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field icon={CalendarDays} label="Date">
+                  <input className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" type="date" {...register('date')} />
+                  <FieldError message={errors.date?.message} />
+                </Field>
+                <Field icon={Clock} label="Time">
+                  <input className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" type="time" {...register('time')} />
+                  <FieldError message={errors.time?.message} />
+                </Field>
+              </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field icon={Globe2} label="Timezone">
                   <select className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" {...register('timezone')}>
                     {timezones.map((value) => <option key={value}>{value}</option>)}
                   </select>
                 </Field>
-                <Field icon={CalendarPlus} label="Selected slot">
-                  <Combobox
-                    options={slots.map((slot) => ({ value: slot.id, label: slot.label }))}
-                    value={selectedSlot?.id}
-                    onChange={setSlotId}
-                    placeholder={slots.length ? 'Pick a slot' : 'No slot available'}
-                    searchPlaceholder="Search slots..."
-                    emptyText="No slot found."
-                    disabled={!slots.length}
-                    clearable={false}
-                  />
+                <Field icon={Timer} label="Duration">
+                  <select className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" {...register('durationMinutes', { valueAsNumber: true })}>
+                    <option value={30}>30 min</option>
+                    <option value={45}>45 min</option>
+                    <option value={60}>1 h</option>
+                    <option value={90}>1 h 30</option>
+                    <option value={120}>2 h</option>
+                  </select>
+                  <FieldError message={errors.durationMinutes?.message} />
                 </Field>
               </div>
-              {!availabilityQuery.isPending && !slots.length && (
-                <div className="rounded-md border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">No available slots this week. Try a later week.</div>
-              )}
               <Field icon={MessageSquare} label="Message">
                 <textarea className="min-h-24 w-full rounded-md border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring" placeholder={`What should ${publicWorkspace.displayName} know?`} {...register('message')} />
               </Field>
               {bookingMutation.isError && <div className="rounded-md border border-busy/30 bg-busy/10 px-3 py-2 text-sm">Unable to send this booking request.</div>}
-              <Button disabled={bookingMutation.isPending || !selectedSlot}>
+              <Button disabled={bookingMutation.isPending}>
                 <CalendarPlus className="h-4 w-4" aria-hidden />
-                {bookingMutation.isPending ? 'Sending' : 'Send request'}
+                {bookingMutation.isPending ? 'Sending…' : 'Send request'}
               </Button>
             </form>
           )}
@@ -582,28 +583,61 @@ function PublicDayColumn({
   publicItems: PublicDayItem[]
   onSelect: (selection: PublicSelection) => void
 }) {
+  // Items are categorised per column: start card, thin stripe (spans through), end card.
+  const startItems = publicItems.filter((item) => item.dayIndex === dayIndex)
+  const endItems = publicItems.filter((item) => item.endDayIndex === dayIndex && item.dayIndex !== dayIndex)
+  const stripeItems = publicItems.filter(
+    (item) =>
+      (item.dayIndex < dayIndex || item.dayIndex === -1) &&
+      (item.endDayIndex === -1 || item.endDayIndex > dayIndex),
+  )
+
+  function buildSelection(item: PublicDayItem): PublicSelection {
+    const isPublic = item.visibility === 'PUBLIC'
+    return {
+      title: item.busy ? item.title : 'Available',
+      startsAt: item.startsAt,
+      endsAt: item.endsAt,
+      description: item.description,
+      entryId: isPublic ? item.id : undefined,
+      colorStyle: isPublic ? { backgroundColor: item.color.background, borderColor: item.color.border, color: item.color.foreground } : undefined,
+    }
+  }
+
   return (
     <div className="relative border-l bg-card" style={{ height: hours.length * hourHeight }}>
       {hours.map((hour) => (
         <div key={hour} className="border-b" style={{ height: hourHeight }} />
       ))}
-      {publicItems.filter((item) => item.dayIndex === dayIndex).map((item) => {
+      {stripeItems.map((item, index) => (
+        <PublicStripe key={`stripe-${item.id}`} item={item} stripeIndex={index} onSelect={() => onSelect(buildSelection(item))} />
+      ))}
+      {startItems.map((item) => {
         const isPublic = item.visibility === 'PUBLIC'
+        const isMultiDay = item.endDayIndex !== dayIndex
         return (
           <PublicBlock
-            key={item.id}
+            key={`start-${item.id}`}
             title={item.busy ? item.title : 'Available'}
             startsAt={item.startsAt}
             endsAt={item.endsAt}
             color={!item.busy ? 'free' : isPublic ? 'public' : 'private'}
-            onSelect={() => onSelect({
-              title: item.busy ? item.title : 'Available',
-              startsAt: item.startsAt,
-              endsAt: item.endsAt,
-              description: item.description,
-              entryId: isPublic ? item.id : undefined,
-              colorStyle: isPublic ? { backgroundColor: item.color.background, borderColor: item.color.border, color: item.color.foreground } : undefined,
-            })}
+            variant={isMultiDay ? 'start' : 'full'}
+            onSelect={() => onSelect(buildSelection(item))}
+          />
+        )
+      })}
+      {endItems.map((item) => {
+        const isPublic = item.visibility === 'PUBLIC'
+        return (
+          <PublicBlock
+            key={`end-${item.id}`}
+            title={item.busy ? item.title : 'Available'}
+            startsAt="00:00"
+            endsAt={item.endsAt}
+            color={!item.busy ? 'free' : isPublic ? 'public' : 'private'}
+            variant="end"
+            onSelect={() => onSelect(buildSelection(item))}
           />
         )
       })}
@@ -611,28 +645,65 @@ function PublicDayColumn({
   )
 }
 
-function PublicBlock({ title, startsAt, endsAt, color, onSelect }: { title: string; startsAt: string; endsAt: string; color: 'private' | 'public' | 'free'; onSelect: () => void }) {
-  const startHour = Number(startsAt.split(':')[0]) + Number(startsAt.split(':')[1]) / 60
-  const endHour = Number(endsAt.split(':')[0]) + Number(endsAt.split(':')[1]) / 60
-  const top = (startHour - hours[0]) * hourHeight
-  const height = Math.max(38, (endHour - startHour) * hourHeight - 6)
+function PublicStripe({
+  item,
+  stripeIndex,
+  onSelect,
+}: {
+  item: PublicDayItem
+  stripeIndex: number
+  onSelect: () => void
+}) {
+  const isPublic = item.visibility === 'PUBLIC'
+  const color = !item.busy ? 'var(--color-available)' : isPublic ? item.color.border : 'var(--color-muted-foreground)'
+  return (
+    <button
+      aria-label={item.busy ? item.title : 'Available'}
+      className="absolute top-0 bottom-0 rounded-full opacity-70 transition-opacity hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      style={{ left: 4 + stripeIndex * 8, width: 4, backgroundColor: color }}
+      onClick={onSelect}
+    />
+  )
+}
+
+function PublicBlock({
+  title,
+  startsAt,
+  endsAt,
+  color,
+  variant = 'full',
+  onSelect,
+}: {
+  title: string
+  startsAt: string
+  endsAt: string
+  color: 'private' | 'public' | 'free'
+  variant?: 'full' | 'start' | 'end'
+  onSelect: () => void
+}) {
+  const startHour = variant === 'end' ? 0 : (Number(startsAt.split(':')[0]) + Number(startsAt.split(':')[1]) / 60)
+  const endHour = variant === 'start' ? 24 : (Number(endsAt.split(':')[0]) + Number(endsAt.split(':')[1]) / 60)
+  const top = startHour * hourHeight
+  const height = variant === 'start'
+    ? Math.max(38, (24 - startHour) * hourHeight - 2)
+    : Math.max(38, (endHour - startHour) * hourHeight - 6)
   const classes =
     color === 'private'
       ? 'border-muted-foreground/30 bg-muted text-muted-foreground'
       : color === 'free'
         ? 'border-available/30 bg-available/10 text-available'
         : 'border-task/30 bg-task/10 text-foreground'
-  const className = `absolute left-2 right-2 overflow-hidden rounded-md border p-2 text-left text-xs ${classes}`
-  const children = (
-    <>
-      <div className="truncate font-semibold">{title}</div>
-      <div className="mt-1 truncate opacity-80">{startsAt} - {endsAt}</div>
-    </>
-  )
+  const radiusClass = variant === 'start' ? 'rounded-t-md rounded-b-none' : variant === 'end' ? 'rounded-t-none rounded-b-md' : 'rounded-md'
 
   return (
-    <button className={`${className} transition-transform hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring`} style={{ top, height }} onClick={onSelect}>
-      {children}
+    <button
+      className={`absolute left-6 right-2 overflow-hidden border p-2 text-left text-xs transition-transform hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${classes} ${radiusClass}`}
+      style={{ top, height }}
+      onClick={onSelect}
+    >
+      <div className="truncate font-semibold">{title}</div>
+      {variant !== 'start' && <div className="mt-1 truncate opacity-80">{startsAt} - {endsAt}</div>}
+      {variant === 'start' && <div className="mt-1 truncate opacity-80">from {startsAt} →</div>}
     </button>
   )
 }
@@ -729,7 +800,8 @@ function formatSlotLabel(value: string, timezone: string) {
 }
 
 function publicApiItemToCalendarItem(item: PublicCalendarItemResponse, index: number, days: Date[], timezone: string, workspaceName: string) {
-  const startsAt = new Date(item.startsAt)
+  const startsAtDate = new Date(item.startsAt)
+  const endsAtDate = new Date(item.endsAt)
   const color = item.color ?? {
     preset: item.public ? 'BLUE' : 'SLATE',
     background: item.public ? '#dbeafe' : '#e2e8f0',
@@ -740,9 +812,12 @@ function publicApiItemToCalendarItem(item: PublicCalendarItemResponse, index: nu
     id: item.public && item.sourceId && item.sourceType ? `${item.sourceType}:${item.sourceId}` : `public-${index}`,
     title: item.public ? item.title ?? 'Public block' : item.busy ? 'Busy' : 'Available',
     kind: item.sourceType === 'TASK' || item.sourceType === 'PROJECT' ? item.sourceType : 'EVENT',
-    dayIndex: dayIndexInTimezone(startsAt, days, timezone),
-    startsAt: formatTimeInTimezone(startsAt, timezone),
-    endsAt: formatTimeInTimezone(new Date(item.endsAt), timezone),
+    dayIndex: dayIndexInTimezone(startsAtDate, days, timezone),
+    endDayIndex: dayIndexInTimezone(endsAtDate, days, timezone),
+    startsAt: formatTimeInTimezone(startsAtDate, timezone),
+    endsAt: formatTimeInTimezone(endsAtDate, timezone),
+    startsAtInstant: item.startsAt,
+    endsAtInstant: item.endsAt,
     visibility: item.public ? 'PUBLIC' : 'PRIVATE',
     busy: item.busy,
     color: {

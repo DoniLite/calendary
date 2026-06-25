@@ -68,6 +68,9 @@ export const bookingRequestSchema = z.object({
   name: z.string().min(1, 'Name is required'),
   email: z.string().min(1, 'Email is required').email('Enter a valid email address'),
   timezone: z.string().min(1, 'Timezone is required'),
+  date: z.string().min(1, 'Date is required'),
+  time: z.string().min(1, 'Time is required'),
+  durationMinutes: z.number().int().min(15, 'Minimum 15 minutes').max(480, 'Maximum 8 hours'),
   message: z.string(),
 })
 export type BookingRequestFormValues = z.infer<typeof bookingRequestSchema>
