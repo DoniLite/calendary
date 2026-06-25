@@ -8,7 +8,9 @@ import com.calendary.workspaces.api.dto.PublicWorkspaceProfileResponse
 import com.calendary.workspaces.api.dto.UpdateWorkspaceSettingsRequest
 import com.calendary.workspaces.api.dto.UpdateWorkspaceThemeRequest
 import com.calendary.workspaces.api.dto.WorkspaceListResponse
+import com.calendary.workspaces.api.dto.WorkspaceMemberListResponse
 import com.calendary.workspaces.api.dto.WorkspaceResponse
+import com.calendary.workspaces.api.dto.toMemberListResponse
 import com.calendary.workspaces.api.dto.toPublicProfileResponse
 import com.calendary.workspaces.api.dto.toResponse
 import com.calendary.workspaces.api.dto.validWorkspaceThemes
@@ -17,8 +19,6 @@ import com.calendary.workspaces.domain.WorkspaceAccessLevel
 import com.calendary.workspaces.domain.WorkspaceType
 import com.calendary.workspaces.infra.WorkspaceMembershipRepository
 import com.calendary.workspaces.infra.WorkspaceRepository
-import com.calendary.users.api.dto.MemberListResponse
-import com.calendary.users.api.dto.toSummary
 import com.calendary.users.domain.UserRole
 import com.calendary.users.infra.UserAccountRepository
 import jakarta.servlet.http.HttpServletRequest
@@ -30,6 +30,7 @@ import java.util.UUID
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.transaction.annotation.Transactional
+import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PatchMapping
 import org.springframework.web.bind.annotation.PathVariable
@@ -60,12 +61,30 @@ class WorkspaceController(
 	fun workspaces(request: HttpServletRequest): WorkspaceListResponse = myWorkspaces(request)
 
 	@GetMapping("/workspaces/{workspaceId}/members")
-	fun members(@PathVariable workspaceId: UUID, request: HttpServletRequest): MemberListResponse {
+	fun members(@PathVariable workspaceId: UUID, request: HttpServletRequest): WorkspaceMemberListResponse {
 		val currentUser = sessions.currentUser(request.getSession(false))
 		workspaceAccess.requireRead(workspaceId, currentUser.id)
-		return MemberListResponse(
-			items = memberships.findByWorkspaceIdOrderByCreatedAtAsc(workspaceId).mapNotNull { it.user?.toSummary() },
-		)
+		return memberships.findByWorkspaceIdOrderByCreatedAtAsc(workspaceId).toMemberListResponse()
+	}
+
+	@DeleteMapping("/workspaces/{workspaceId}/members/{userId}")
+	@ResponseStatus(HttpStatus.NO_CONTENT)
+	@Transactional
+	fun removeMember(
+		@PathVariable workspaceId: UUID,
+		@PathVariable userId: UUID,
+		httpRequest: HttpServletRequest,
+	) {
+		val currentUser = sessions.currentUser(httpRequest.getSession(false))
+		val workspace = workspaceAccess.requireWrite(workspaceId, currentUser.id)
+		val callerMembership = memberships.findByWorkspaceIdAndUserId(workspace.id, currentUser.id).orElseThrow()
+		if (callerMembership.accessLevel != WorkspaceAccessLevel.OWNER) {
+			throw ForbiddenException("Only the workspace owner can remove collaborators.")
+		}
+		require(userId != currentUser.id) { "The workspace owner cannot remove themself." }
+		val membership = memberships.findByWorkspaceIdAndUserId(workspaceId, userId)
+			.orElseThrow { IllegalArgumentException("Membership not found.") }
+		memberships.delete(membership)
 	}
 
 	@PatchMapping("/workspaces/{workspaceId}/settings")

@@ -66,7 +66,7 @@ class B2ObjectStorageService(
 		val response = http.send(request, HttpResponse.BodyHandlers.ofString())
 		check(response.statusCode() in 200..299) { "B2 download authorization failed with status ${response.statusCode()}." }
 		val token = extractJsonString(response.body(), "authorizationToken")
-		val overrideParams = overrides.entries.joinToString("") { (field, value) -> "&$field=${URLEncoder.encode(value, StandardCharsets.UTF_8)}" }
+		val overrideParams = overrides.entries.joinToString("") { (field, value) -> "&$field=${encodeQueryValue(value)}" }
 		return "${auth.downloadUrl}/file/${properties.bucketName}/${encodePath(key)}?Authorization=$token$overrideParams"
 	}
 
@@ -108,7 +108,15 @@ class B2ObjectStorageService(
 	}
 
 	private fun encodePath(value: String): String =
-		value.split("/").joinToString("/") { URLEncoder.encode(it, StandardCharsets.UTF_8).replace("+", "%20") }
+		value.split("/").joinToString("/") { encodeQueryValue(it) }
+
+	// java.net.URLEncoder encodes spaces as `+`, which is form-data encoding, not a valid escape
+	// in a URL path or query string — B2 (and most servers) only recognize `%20`. Mismatched
+	// encoding here is exactly the kind of thing that makes a b2ContentDisposition/b2ContentType
+	// override silently fail to match what was authorized, since B2 compares the query string
+	// value byte-for-byte against what get_download_authorization signed.
+	private fun encodeQueryValue(value: String): String =
+		URLEncoder.encode(value, StandardCharsets.UTF_8).replace("+", "%20")
 
 	// Drops characters that would either break out of the JSON string or let a crafted filename
 	// inject extra header lines into the Content-Disposition response header.

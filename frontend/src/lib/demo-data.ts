@@ -27,6 +27,10 @@ export type CalendarItem = {
   dayIndex: number
   startsAt: string
   endsAt: string
+  // ISO instants — absent for static/demo items, present for items built from real API data,
+  // used to sort/derive multi-day spans precisely instead of re-parsing the display strings.
+  startsAtInstant?: string
+  endsAtInstant?: string
   visibility: 'PRIVATE' | 'PUBLIC'
   busy: boolean
   color: ItemColor

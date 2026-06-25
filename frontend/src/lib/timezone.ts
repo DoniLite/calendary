@@ -1,28 +1,3 @@
-export const DEFAULT_SOURCE_TIMEZONE = 'Europe/Paris'
-
-type TimedCalendarItem = {
-  dayIndex: number
-  startsAt: string
-  endsAt: string
-}
-
-export function convertWallClockRange<T extends TimedCalendarItem>(item: T, days: Date[], targetTimezone: string, sourceTimezone = DEFAULT_SOURCE_TIMEZONE): T {
-  if (targetTimezone === sourceTimezone) {
-    return item
-  }
-
-  const sourceDay = days[item.dayIndex] ?? days[0] ?? new Date()
-  const startsAt = zonedWallTimeToInstant(sourceDay, item.startsAt, sourceTimezone)
-  const endsAt = zonedWallTimeToInstant(sourceDay, item.endsAt, sourceTimezone)
-
-  return {
-    ...item,
-    dayIndex: dayIndexInTimezone(startsAt, days, targetTimezone),
-    startsAt: formatTimeInTimezone(startsAt, targetTimezone),
-    endsAt: formatTimeInTimezone(endsAt, targetTimezone),
-  }
-}
-
 export function formatTimeInTimezone(date: Date, timezone: string) {
   return new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: timezone }).format(date)
 }
@@ -36,13 +11,49 @@ export function dayIndexInTimezone(date: Date, days: Date[], timezone: string) {
   return days.findIndex((day) => formatDateKeyInTimezone(day, timezone) === dateKey)
 }
 
-function zonedWallTimeToInstant(day: Date, time: string, timezone: string) {
-  const [hours = '0', minutes = '0'] = time.split(':')
-  const utcGuess = new Date(Date.UTC(day.getFullYear(), day.getMonth(), day.getDate(), Number(hours), Number(minutes), 0, 0))
+export type DateParts = { year: number; month: number; day: number }
+
+export function datePartsInTimezone(date: Date, timezone: string): DateParts {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: timezone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date)
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]))
+  return { year: Number(values.year), month: Number(values.month) - 1, day: Number(values.day) }
+}
+
+// The instant corresponding to 00:00 wall-clock time on the given calendar date, as observed in
+// `timezone`. Two passes because the UTC offset itself can depend on the instant (DST) — the
+// first pass's offset may land just the wrong side of a transition, so it's corrected once more
+// against its own result. This is the same correction `wallTimeToInstant`'s callers below rely on.
+export function wallTimeToInstant(parts: DateParts, hour: number, minute: number, timezone: string): Date {
+  const utcGuess = new Date(Date.UTC(parts.year, parts.month, parts.day, hour, minute, 0, 0))
   const firstOffset = timezoneOffset(utcGuess, timezone)
   const firstInstant = new Date(utcGuess.getTime() - firstOffset)
   const secondOffset = timezoneOffset(firstInstant, timezone)
   return new Date(utcGuess.getTime() - secondOffset)
+}
+
+export function startOfDayInTimezone(date: Date, timezone: string): Date {
+  return wallTimeToInstant(datePartsInTimezone(date, timezone), 0, 0, timezone)
+}
+
+// Pure calendar-date arithmetic (no wall-clock/DST math involved in the addition itself, only in
+// the final conversion back to an instant) — adding 7 calendar days always lands on the same
+// weekday regardless of any DST transition crossed along the way.
+export function addCalendarDaysInTimezone(date: Date, amount: number, timezone: string): Date {
+  const parts = datePartsInTimezone(date, timezone)
+  const rolled = new Date(Date.UTC(parts.year, parts.month, parts.day + amount))
+  return wallTimeToInstant({ year: rolled.getUTCFullYear(), month: rolled.getUTCMonth(), day: rolled.getUTCDate() }, 0, 0, timezone)
+}
+
+export function startOfWeekInTimezone(date: Date, timezone: string): Date {
+  const startOfToday = startOfDayInTimezone(date, timezone)
+  const weekday = new Intl.DateTimeFormat('en-US', { timeZone: timezone, weekday: 'short' }).format(startOfToday)
+  const isoWeekdayIndex = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].indexOf(weekday)
+  return addCalendarDaysInTimezone(startOfToday, -Math.max(0, isoWeekdayIndex), timezone)
 }
 
 function timezoneOffset(date: Date, timezone: string) {

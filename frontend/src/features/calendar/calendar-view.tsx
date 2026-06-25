@@ -1,6 +1,6 @@
 import { CalendarClock, ChevronLeft, ChevronRight, Globe2, Lock, Paperclip, Users } from 'lucide-react'
 import { Link, useRouterState } from '@tanstack/react-router'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Badge } from '../../components/ui/badge'
 import { Button } from '../../components/ui/button'
 import { Panel, PanelBody, PanelHeader, PanelTitle } from '../../components/ui/panel'
@@ -8,28 +8,58 @@ import { TabBar, TabButton } from '../../components/ui/tabs'
 import { useWorkspaceSession } from '../auth/workspace-session'
 import { useCalendarQuery, type CalendarItemResponse } from '../../lib/api'
 import { itemColors, type CalendarItem } from '../../lib/demo-data'
-import { dayIndexInTimezone, formatTimeInTimezone } from '../../lib/timezone'
+import { addCalendarDaysInTimezone, datePartsInTimezone, formatTimeInTimezone, startOfWeekInTimezone } from '../../lib/timezone'
+import { cn } from '../../lib/utils'
 
 const hours = Array.from({ length: 18 }, (_, index) => 7 + index)
 const hourHeight = 88
 const dayWidth = 190
-const timezones = ['Europe/Paris', 'UTC', 'America/New_York', 'Africa/Abidjan', 'Asia/Tokyo']
+const baseTimezones = ['Europe/Paris', 'UTC', 'America/New_York', 'Africa/Abidjan', 'Asia/Tokyo']
 type CalendarMode = 'week' | 'day' | 'agenda'
+
+type CalendarSegment = {
+  item: CalendarItem
+  dayIndex: number
+  startMinutes: number
+  endMinutes: number
+  continuesBefore: boolean
+  continuesAfter: boolean
+}
 
 export function CalendarView() {
   const { activeWorkspace, activeWorkspaceId, apiEnabled, user } = useWorkspaceSession()
   const canWrite = activeWorkspace?.accessLevel !== 'READ'
   const inCollaboratorPortal = useRouterState({ select: (state) => state.location.pathname.startsWith('/collab') })
-  const [timezone, setTimezone] = useState('Europe/Paris')
+  // Defaults to the workspace's own timezone (set in Settings) instead of a hardcoded one, and
+  // re-syncs if the workspace's timezone changes — not just on first mount.
+  const [timezone, setTimezone] = useState(activeWorkspace?.defaultTimezone ?? 'UTC')
+  useEffect(() => {
+    if (activeWorkspace?.defaultTimezone) setTimezone(activeWorkspace.defaultTimezone)
+  }, [activeWorkspace?.defaultTimezone])
+  const timezones = useMemo(
+    () => (activeWorkspace?.defaultTimezone && !baseTimezones.includes(activeWorkspace.defaultTimezone)
+      ? [activeWorkspace.defaultTimezone, ...baseTimezones]
+      : baseTimezones),
+    [activeWorkspace?.defaultTimezone],
+  )
   const [mode, setMode] = useState<CalendarMode>('week')
-  const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()))
-  const weekEnd = useMemo(() => addDays(weekStart, 7), [weekStart])
-  const days = useMemo(() => Array.from({ length: 7 }, (_, index) => addDays(weekStart, index)), [weekStart])
+  const [weekStart, setWeekStart] = useState(() => startOfWeekInTimezone(new Date(), timezone))
+  // Re-anchors to "this week" whenever the display timezone changes, since a Date instant
+  // computed as "midnight Monday" under one timezone is a different calendar day under another.
+  useEffect(() => {
+    setWeekStart(startOfWeekInTimezone(new Date(), timezone))
+  }, [timezone])
+  const weekEnd = useMemo(() => addCalendarDaysInTimezone(weekStart, 7, timezone), [weekStart, timezone])
+  const days = useMemo(
+    () => Array.from({ length: 7 }, (_, index) => addCalendarDaysInTimezone(weekStart, index, timezone)),
+    [weekStart, timezone],
+  )
   const visibleDays = mode === 'day' ? [{ date: days[0], dayIndex: 0 }] : days.map((date, dayIndex) => ({ date, dayIndex }))
   const calendarQuery = useCalendarQuery(activeWorkspaceId, weekStart, weekEnd)
-  const calendarData = (calendarQuery.data?.items ?? [])
-    .map((item) => toCalendarItem(item, days, timezone, activeWorkspace?.name, user?.email))
-    .filter((item) => item.dayIndex >= 0)
+  const { items: calendarData, segments } = useMemo(
+    () => buildCalendarItemsAndSegments(calendarQuery.data?.items ?? [], days, timezone, activeWorkspace?.name, user?.email),
+    [calendarQuery.data, days, timezone, activeWorkspace?.name, user?.email],
+  )
   const [selectedId, setSelectedId] = useState(calendarData[0]?.id)
   const selected = calendarData.find((item) => item.id === selectedId) ?? calendarData[0]
 
@@ -58,10 +88,10 @@ export function CalendarView() {
               ))}
             </select>
           </label>
-          <Button variant="secondary" aria-label="Previous period" onClick={() => setWeekStart((current) => addDays(current, mode === 'day' ? -1 : -7))}>
+          <Button variant="secondary" aria-label="Previous period" onClick={() => setWeekStart((current) => addCalendarDaysInTimezone(current, mode === 'day' ? -1 : -7, timezone))}>
             <ChevronLeft className="h-4 w-4" aria-hidden />
           </Button>
-          <Button variant="secondary" aria-label="Next period" onClick={() => setWeekStart((current) => addDays(current, mode === 'day' ? 1 : 7))}>
+          <Button variant="secondary" aria-label="Next period" onClick={() => setWeekStart((current) => addCalendarDaysInTimezone(current, mode === 'day' ? 1 : 7, timezone))}>
             <ChevronRight className="h-4 w-4" aria-hidden />
           </Button>
           {canWrite && (
@@ -117,7 +147,7 @@ export function CalendarView() {
                   ))}
                 </div>
                 {visibleDays.map((day) => (
-                  <DayColumn key={day.date.toISOString()} items={calendarData} dayIndex={day.dayIndex} selectedId={selected?.id} onSelect={setSelectedId} />
+                  <DayColumn key={day.date.toISOString()} segments={segments} dayIndex={day.dayIndex} selectedId={selected?.id} onSelect={setSelectedId} />
                 ))}
               </div>
             </div>
@@ -155,7 +185,7 @@ export function CalendarView() {
 }
 
 function AgendaList({ items, onSelect }: { items: CalendarItem[]; onSelect: (id: string) => void }) {
-  const sortedItems = [...items].sort((a, b) => a.dayIndex - b.dayIndex || toMinutes(a.startsAt) - toMinutes(b.startsAt))
+  const sortedItems = [...items].sort((a, b) => (a.startsAtInstant ?? '').localeCompare(b.startsAtInstant ?? ''))
   return (
     <div className="max-h-[720px] overflow-auto p-4">
       <div className="space-y-3">
@@ -181,25 +211,28 @@ function AgendaList({ items, onSelect }: { items: CalendarItem[]; onSelect: (id:
   )
 }
 
-function DayColumn({ items: allItems, dayIndex, selectedId, onSelect }: { items: CalendarItem[]; dayIndex: number; selectedId?: string; onSelect: (id: string) => void }) {
-  const items = useMemo(() => layoutDay(allItems.filter((item) => item.dayIndex === dayIndex)), [allItems, dayIndex])
+function DayColumn({ segments: allSegments, dayIndex, selectedId, onSelect }: { segments: CalendarSegment[]; dayIndex: number; selectedId?: string; onSelect: (id: string) => void }) {
+  const segments = useMemo(() => layoutSegments(allSegments.filter((segment) => segment.dayIndex === dayIndex)), [allSegments, dayIndex])
   return (
     <div className="relative border-l bg-card" style={{ height: hours.length * hourHeight }}>
       {hours.map((hour) => (
         <div key={hour} className="border-b" style={{ height: hourHeight }} />
       ))}
-      {items.map(({ item, column, columns }) => {
-        const start = toMinutes(item.startsAt)
-        const end = toMinutes(item.endsAt)
-        const top = ((start - hours[0] * 60) / 60) * hourHeight
-        const height = Math.max(42, ((end - start) / 60) * hourHeight - 6)
+      {segments.map(({ segment, column, columns }) => {
+        const item = segment.item
+        const top = ((segment.startMinutes - hours[0] * 60) / 60) * hourHeight
+        const height = Math.max(42, ((segment.endMinutes - segment.startMinutes) / 60) * hourHeight - 6)
         const width = (dayWidth - 18) / columns
         const left = 8 + column * width
         const compact = height < 76 || width < 92
         return (
           <button
-            key={item.id}
-            className="absolute overflow-hidden rounded-md border p-2 text-left text-xs shadow-sm transition-transform hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            key={`${item.id}-${dayIndex}`}
+            className={cn(
+              'absolute overflow-hidden border p-2 text-left text-xs shadow-sm transition-transform hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+              segment.continuesBefore ? 'rounded-t-none' : 'rounded-t-md',
+              segment.continuesAfter ? 'rounded-b-none' : 'rounded-b-md',
+            )}
             style={{
               top,
               left,
@@ -211,9 +244,12 @@ function DayColumn({ items: allItems, dayIndex, selectedId, onSelect }: { items:
             }}
             onClick={() => onSelect(item.id)}
           >
-            <div className="min-w-0 truncate font-semibold leading-4">{item.title}</div>
+            <div className="min-w-0 truncate font-semibold leading-4">
+              {item.title}
+              {(segment.continuesBefore || segment.continuesAfter) && <span className="ml-1 opacity-70">⋯</span>}
+            </div>
             <div className="mt-1 min-w-0 truncate leading-4 opacity-80">
-              {item.startsAt} - {item.endsAt}
+              {formatMinutesLabel(segment.startMinutes)} - {formatMinutesLabel(segment.endMinutes)}
             </div>
             <div className={compact ? 'mt-1 flex min-w-0 gap-1' : 'mt-2 flex min-w-0 flex-wrap gap-1'}>
               <span className="min-w-0 max-w-full truncate rounded-sm bg-white/55 px-1.5 py-0.5 leading-4">{item.kind}</span>
@@ -300,33 +336,91 @@ function Detail({ label, value }: { label: string; value: string }) {
   )
 }
 
-function layoutDay(items: CalendarItem[]) {
-  return items.map((item) => {
-    const overlapping = items.filter((candidate) => toMinutes(candidate.startsAt) < toMinutes(item.endsAt) && toMinutes(candidate.endsAt) > toMinutes(item.startsAt))
+// One CalendarItemResponse becomes one logical CalendarItem (for the Agenda list / detail panel)
+// plus one segment per visible day it touches (for the hourly grid) — an item spanning several
+// days renders as one clipped block per day instead of being squashed into a single day with a
+// time window that ignores the days it actually continues through.
+function buildCalendarItemsAndSegments(
+  responses: CalendarItemResponse[],
+  days: Date[],
+  timezone: string,
+  workspaceName?: string,
+  owner?: string,
+): { items: CalendarItem[]; segments: CalendarSegment[] } {
+  const items: CalendarItem[] = []
+  const segments: CalendarSegment[] = []
+  for (const response of responses) {
+    const startInstant = new Date(response.startsAt)
+    const endInstant = new Date(response.endsAt)
+    const itemSegments = buildSegments(startInstant, endInstant, days, timezone)
+    if (!itemSegments.length) continue
+    const item = toCalendarItem(response, startInstant, endInstant, itemSegments[0].dayIndex, timezone, workspaceName, owner)
+    items.push(item)
+    for (const segment of itemSegments) segments.push({ ...segment, item })
+  }
+  return { items, segments }
+}
+
+function buildSegments(startInstant: Date, endInstant: Date, days: Date[], timezone: string): Omit<CalendarSegment, 'item'>[] {
+  const result: Omit<CalendarSegment, 'item'>[] = []
+  for (let dayIndex = 0; dayIndex < days.length; dayIndex++) {
+    const dayStart = days[dayIndex]
+    const dayEnd = addCalendarDaysInTimezone(dayStart, 1, timezone)
+    const segmentStart = startInstant.getTime() > dayStart.getTime() ? startInstant : dayStart
+    const segmentEnd = endInstant.getTime() < dayEnd.getTime() ? endInstant : dayEnd
+    if (segmentStart.getTime() >= segmentEnd.getTime()) continue
+    result.push({
+      dayIndex,
+      startMinutes: (segmentStart.getTime() - dayStart.getTime()) / 60_000,
+      endMinutes: (segmentEnd.getTime() - dayStart.getTime()) / 60_000,
+      continuesBefore: startInstant.getTime() < dayStart.getTime(),
+      continuesAfter: endInstant.getTime() > dayEnd.getTime(),
+    })
+  }
+  return result
+}
+
+function layoutSegments(segments: CalendarSegment[]) {
+  return segments.map((segment) => {
+    const overlapping = segments.filter((candidate) => candidate.startMinutes < segment.endMinutes && candidate.endMinutes > segment.startMinutes)
     return {
-      item,
-      column: overlapping.findIndex((candidate) => candidate.id === item.id),
+      segment,
+      column: overlapping.findIndex((candidate) => candidate.item.id === segment.item.id),
       columns: Math.max(1, overlapping.length),
     }
   })
 }
 
-function toMinutes(value: string) {
-  const [hour, minute] = value.split(':').map(Number)
-  return hour * 60 + minute
+function formatMinutesLabel(minutes: number) {
+  const clamped = Math.max(0, Math.min(1440, Math.round(minutes)))
+  if (clamped === 1440) return '24:00'
+  const hour = Math.floor(clamped / 60)
+  const minute = clamped % 60
+  return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`
 }
 
-function toCalendarItem(item: CalendarItemResponse, days: Date[], timezone: string, workspaceName = 'Workspace', owner = 'Calendary'): CalendarItem {
-  const startsAt = new Date(item.startsAt)
-  const endsAt = new Date(item.endsAt)
+function toCalendarItem(
+  item: CalendarItemResponse,
+  startInstant: Date,
+  endInstant: Date,
+  dayIndex: number,
+  timezone: string,
+  workspaceName = 'Workspace',
+  owner = 'Calendary',
+): CalendarItem {
+  const startParts = datePartsInTimezone(startInstant, timezone)
+  const endParts = datePartsInTimezone(endInstant, timezone)
+  const spansMultipleDays = startParts.year !== endParts.year || startParts.month !== endParts.month || startParts.day !== endParts.day
   return {
     id: item.id,
     sourceId: item.sourceId,
     title: item.title,
     kind: item.sourceType,
-    dayIndex: dayIndexInTimezone(startsAt, days, timezone),
-    startsAt: formatTimeInTimezone(startsAt, timezone),
-    endsAt: formatTimeInTimezone(endsAt, timezone),
+    dayIndex,
+    startsAt: spansMultipleDays ? formatDateTimeLabel(startInstant, timezone) : formatTimeInTimezone(startInstant, timezone),
+    endsAt: spansMultipleDays ? formatDateTimeLabel(endInstant, timezone) : formatTimeInTimezone(endInstant, timezone),
+    startsAtInstant: item.startsAt,
+    endsAtInstant: item.endsAt,
     visibility: item.visibility,
     busy: item.busy,
     color: {
@@ -345,18 +439,8 @@ function toCalendarItem(item: CalendarItemResponse, days: Date[], timezone: stri
   }
 }
 
-function startOfWeek(date: Date) {
-  const value = new Date(date)
-  value.setHours(0, 0, 0, 0)
-  const day = value.getDay()
-  value.setDate(value.getDate() - (day === 0 ? 6 : day - 1))
-  return value
-}
-
-function addDays(date: Date, days: number) {
-  const value = new Date(date)
-  value.setDate(value.getDate() + days)
-  return value
+function formatDateTimeLabel(date: Date, timezone: string) {
+  return new Intl.DateTimeFormat(undefined, { month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false, timeZone: timezone }).format(date)
 }
 
 function formatDayLabel(date: Date, timezone: string) {
